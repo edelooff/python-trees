@@ -41,34 +41,25 @@ class AVLTree:
     def rebalance(self, node):
         while node.parent is not None:
             parent = node.parent
-            if node is parent.right:
-                if parent.balance > 0:
-                    grandparent = parent.parent
-                    if node.balance < 0:
-                        rebalanced_root = self.rotate_right_left(parent)
-                    else:
-                        rebalanced_root = self.rotate_left(parent)
-                elif parent.balance < 0:
-                    parent.balance = 0
-                    break
+            parent.balance += (-1 if node is parent.left else 1)
+            if parent.balance == 0:
+                break
+            elif parent.balance in {-1, 1}:
+                node = parent
+                continue
+
+            grandparent = parent.parent
+            if parent.balance > 1:
+                if node.balance >= 0:
+                    rebalanced_root = self.rotate_left(parent)
                 else:
-                    parent.balance += 1
-                    node = parent
-                    continue
+                    rebalanced_root = self.rotate_right_left(parent)
             else:
-                if parent.balance < 0:
-                    grandparent = parent.parent
-                    if node.balance > 0:
-                        rebalanced_root = self.rotate_left_right(parent)
-                    else:
-                        rebalanced_root = self.rotate_right(parent)
-                elif parent.balance > 0:
-                    parent.balance = 0
-                    break
+                if node.balance <= 0:
+                    rebalanced_root = self.rotate_right(parent)
                 else:
-                    parent.balance -= 1
-                    node = parent
-                    continue
+                    rebalanced_root = self.rotate_left_right(parent)
+
             rebalanced_root.parent = grandparent
             if grandparent is None:
                 self.root = rebalanced_root

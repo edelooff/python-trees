@@ -1,0 +1,14 @@
+# Python files, packages and paths
+*.py[cod]
+*.egg
+*.egg-info
+env
+dist
+build
+eggs
+parts
+sdist
+develop-eggs
+
+# Created images files
+*.png

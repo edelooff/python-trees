@@ -47,26 +47,20 @@ class AVLTree:
             elif parent.balance in {-1, 1}:
                 node = parent
                 continue
-
+            elif parent.balance > 1:
+                same = node.balance >= 0
+                rotate = self.rotate_left if same else self.rotate_right_left
+            else:
+                same = node.balance <= 0
+                rotate = self.rotate_right if same else self.rotate_left_right
             grandparent = parent.parent
-            if parent.balance > 1:
-                if node.balance >= 0:
-                    rebalanced_root = self.rotate_left(parent)
-                else:
-                    rebalanced_root = self.rotate_right_left(parent)
-            else:
-                if node.balance <= 0:
-                    rebalanced_root = self.rotate_right(parent)
-                else:
-                    rebalanced_root = self.rotate_left_right(parent)
-
-            rebalanced_root.parent = grandparent
             if grandparent is None:
-                self.root = rebalanced_root
+                self.root = rotate(parent)
+                self.root.parent = None
             elif parent is grandparent.left:
-                grandparent.left = rebalanced_root
+                grandparent.assign_left(rotate(parent))
             else:
-                grandparent.right = rebalanced_root
+                grandparent.assign_right(rotate(parent))
             break
 
     def rotate_left(self, root):

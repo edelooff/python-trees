@@ -58,14 +58,29 @@ def graph_avl_tree(tree):
 
 
 def heavy_edge(node):
-    if node.parent is not None:
-        heavy_edge_balance = -1 if node.parent.left is node else 1
-        return node.parent.balance == heavy_edge_balance
+    """Returns whether the node is on a longer (heavier) branch of the tree.
+
+    To account for edges on newly inserted nodes, where the parent's balance
+    has not been updated, this function explicitly checks for 'only child'
+    situations, in which case the edge is considered 'heavy'.
+    """
+    parent = node.parent
+    if parent is not None:
+        if node is parent.left:
+            return parent.balance < 0 or parent.right is None
+        return parent.balance > 0 or parent.left is None
 
 
 def node_height(node):
+    """Returns the height of the largest subtree under this node.
+
+    This ensures that values are correctly sorted horizontally, at the cost of
+    some horizontal space. The traversal algorithm prefers exploring the path
+    that the balance factor leans towards, but otherwise will go left-first.
+    This is to account for inaccurate balance factors during rebalancing.
+    """
     height = -1
     while node:
-        node = node.right if node.balance > 0 else node.left
+        node = node.right if node.balance > 0 else (node.left or node.right)
         height += 1
     return height

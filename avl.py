@@ -2,8 +2,12 @@
 
 
 class AVLTree:
-    def __init__(self):
+    def __init__(self, event_bus=None):
         self.root = None
+        if event_bus is None:
+            self.publish = lambda topic, **msg: None
+        else:
+            self.publish = event_bus.publish
 
     def __contains__(self, key):
         node = self.root
@@ -16,6 +20,7 @@ class AVLTree:
     def insert(self, key):
         if self.root is None:
             self.root = AVLNode(key)
+            self.publish('insert', tree=self, node=self.root)
             return self.root
 
         node = self.root
@@ -32,6 +37,7 @@ class AVLTree:
                     node = node.right
                     continue
                 node.right = new = AVLNode(key, parent=node)
+            self.publish('insert', tree=self, node=new)
             self.rebalance(new)
             return new
 
@@ -56,17 +62,20 @@ class AVLTree:
                 rotate = self.rotate_right if same else self.rotate_left_right
             # Attach rebalanced subtree to grandparent, or tree root
             grandparent = parent.parent
+            subtree_root = rotate(parent)
             if grandparent is None:
-                self.root = rotate(parent)
+                self.root = subtree_root
                 self.root.parent = None
             elif parent is grandparent.left:
-                grandparent.assign_left(rotate(parent))
+                grandparent.assign_left(subtree_root)
             else:
-                grandparent.assign_right(rotate(parent))
+                grandparent.assign_right(subtree_root)
+            self.publish('balanced', tree=self, root=subtree_root)
             break
 
     def rotate_left(self, root):
         pivot = root.right
+        self.publish('rotate.left', tree=self, nodes={root, pivot})
         root.assign_right(pivot.left)
         pivot.assign_left(root)
         if pivot.balance == 0:
@@ -79,6 +88,7 @@ class AVLTree:
 
     def rotate_right(self, root):
         pivot = root.left
+        self.publish('rotate.right', tree=self, nodes={root, pivot})
         root.assign_left(pivot.right)
         pivot.assign_right(root)
         if pivot.balance == 0:
@@ -92,6 +102,8 @@ class AVLTree:
     def rotate_left_right(self, root):
         smallest = root.left
         pivot = smallest.right
+        self.publish('rotate.leftright', tree=self, nodes={
+            root, pivot, smallest})
         smallest.assign_right(pivot.left)
         root.assign_left(pivot.right)
         pivot.assign_left(smallest)
@@ -111,6 +123,8 @@ class AVLTree:
     def rotate_right_left(self, root):
         smallest = root.right
         pivot = smallest.left
+        self.publish('rotate.rightleft', tree=self, nodes={
+            root, pivot, smallest})
         smallest.assign_left(pivot.right)
         root.assign_right(pivot.left)
         pivot.assign_left(root)
@@ -148,3 +162,26 @@ class AVLNode:
         self.right = child
         if child is not None:
             child.parent = self
+
+
+class EventBus:
+    """A trivial pub/sub model to allow observation of tree internals."""
+    def __init__(self):
+        self.subscribers = {}
+
+    def publish(self, topic, **message):
+        full_topic = topic
+        while topic:
+            for handler in self.subscribers.get(topic, ()):
+                handler(full_topic, message)
+            topic, _, _ = topic.rpartition('.')
+
+    def subscribe(self, topic, handler=None):
+        def _wrapper(handler):
+            self.subscribers.setdefault(topic, set()).add(handler)
+            return handler
+        return _wrapper if handler is None else _wrapper(handler)
+
+    def unsubscribe(self, handler):
+        for handlers in self.subscribers.values():
+            handlers.discard(handler)

@@ -1,17 +1,24 @@
 import random
 
-from avl import AVLTree
-from grapher import graph_avl_tree
+from avl import (
+    AVLTree,
+    EventBus)
+from grapher import EventAnimator
+
+
+def fully_graphed_tree(base_name):
+    event_bus = EventBus()
+    animator = EventAnimator(base_name)
+    event_bus.subscribe('insert', animator.graph_insert)
+    event_bus.subscribe('rotate', animator.graph_rotation)
+    event_bus.subscribe('balanced', animator.graph_rebalanced)
+    return AVLTree(event_bus=event_bus)
 
 
 def main():
-    tree = AVLTree()
-    numbers = random.sample(range(100), 32)
-    for index, num in enumerate(numbers):
-        print(f'INSERTING {num} INTO TREE')
+    tree = fully_graphed_tree('balanced_inserts')
+    for num in random.sample(range(100, 1000), 32):
         tree.insert(num)
-        graph = graph_avl_tree(tree)
-        graph.write_png(f'tree_{index}.png')
 
 
 if __name__ == '__main__':

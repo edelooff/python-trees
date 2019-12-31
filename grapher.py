@@ -46,19 +46,15 @@ class EventAnimator:
 class MarkedNodes:
     def __init__(self, nodes, hue=0):
         self.nodes = nodes
-        self.hue = hue
+        self.edge_color = self._create_color(hue, 0.2)
+        self.fill_color = self._create_color(hue, 0.94)
 
     def __contains__(self, other):
         return other in self.nodes
 
-    @property
-    def edge_color(self):
-        rgb_color = (round(val * 255) for val in hls_to_rgb(self.hue, 0.2, 1))
-        return '#{:02x}{:02x}{:02x}'.format(*rgb_color)
-
-    @property
-    def fill_color(self):
-        rgb_color = (round(val * 255) for val in hls_to_rgb(self.hue, 0.93, 1))
+    @staticmethod
+    def _create_color(hue, lightness):
+        rgb_color = (round(val * 255) for val in hls_to_rgb(hue, lightness, 1))
         return '#{:02x}{:02x}{:02x}'.format(*rgb_color)
 
 

@@ -139,9 +139,6 @@ class AVLNode:
     def __repr__(self):
         return f'<AVLNode(value={self.value!r})>'
 
-    def __hash__(self):
-        return id(self)
-
     def assign_left(self, child):
         self.left = child
         if child is not None:

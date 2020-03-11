@@ -1,5 +1,6 @@
 from collections import deque
 from colorsys import hls_to_rgb
+from functools import lru_cache
 
 from pydot import (
     Dot,
@@ -58,10 +59,10 @@ class MarkedNodes:
         return '#{:02x}{:02x}{:02x}'.format(*rgb_color)
 
 
-def draw_marker(graph, node):
+def draw_marker(graph, node, marker_height):
     """Draws an invisible marker node to separate left and right children."""
     source = node.value
-    for _ in range(node_height(node)):
+    for _ in range(marker_height):
         label = f':{source}'
         graph.add_node(Node(label, label='', width=0, height=0, style='invis'))
         graph.add_edge(Edge(source, label, style='invis', weight=100))
@@ -90,6 +91,7 @@ def graph_avl_tree(tree, marked_nodes=None):
     graph.set_edge_defaults(color='navy', penwidth=2)
     graph.set_node_defaults(**NODE_STYLE)
     marked_nodes = marked_nodes or set()
+    height = node_height()
     if tree.root is not None:
         draw_node(graph, tree.root, marked_nodes)
         nodes = deque([tree.root])
@@ -99,7 +101,7 @@ def graph_avl_tree(tree, marked_nodes=None):
                 draw_node(graph, node.left, marked_nodes)
                 nodes.append(node.left)
             if node.left or node.right:
-                draw_marker(graph, node)
+                draw_marker(graph, node, height(node))
             if node.right:
                 draw_node(graph, node.right, marked_nodes)
                 nodes.append(node.right)
@@ -120,16 +122,17 @@ def heavy_edge(node):
         return parent.balance > 0 or parent.left is None
 
 
-def node_height(node):
+def node_height(cache_size=256):
     """Returns the height of the largest subtree under this node.
 
-    This ensures that values are correctly sorted horizontally, at the cost of
-    some horizontal space. The traversal algorithm prefers exploring the path
-    that the balance factor leans towards, but otherwise will go left-first.
-    This is to account for inaccurate balance factors during rebalancing.
+    The height is determined recursively by going down the entire subtree.
+    This avoids suboptimal results in trees where balance factors have not been
+    updated yet. A cache ensures that determining the height of all subtrees
+    in the tree only takes time on the order of the number of nodes.
     """
-    height = -1
-    while node:
-        node = node.right if node.balance > 0 else (node.left or node.right)
-        height += 1
+    @lru_cache(maxsize=cache_size)
+    def height(node):
+        if node is None:
+            return -1
+        return 1 + max(height(node.left), height(node.right))
     return height

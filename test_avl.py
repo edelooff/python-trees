@@ -2,14 +2,43 @@ import pytest
 
 
 @pytest.fixture
-def tree():
+def Tree():
     from avl import AVLTree
-    return AVLTree()
+    return AVLTree
 
 
-def test_single_item_tree(tree):
+@pytest.fixture
+def tree(Tree):
+    return Tree()
+
+
+def test_tree_insert(tree):
     tree.insert(5)
     assert 5 in tree
+
+
+def test_tree_bulk_insert(tree):
+    tree.bulk_insert([1, 2])
+    assert 1 in tree
+    assert 2 in tree
+
+
+def test_instantiate_from_list(Tree):
+    tree = Tree([1, 2])
+    assert 1 in tree
+    assert 2 in tree
+
+
+def test_instantiate_from_iter(Tree):
+    tree = Tree(range(1, 3))
+    assert 1 in tree
+    assert 2 in tree
+
+
+def test_instantiate_from_params(Tree):
+    tree = Tree(1, 2)
+    assert 1 in tree
+    assert 2 in tree
 
 
 def test_double_insert_exception(tree):

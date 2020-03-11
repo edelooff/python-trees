@@ -2,12 +2,13 @@
 
 
 class AVLTree:
-    def __init__(self, event_bus=None):
+    def __init__(self, *initial_values, event_bus=None):
         self.root = None
         if event_bus is None:
             self.publish = lambda topic, **msg: None
         else:
             self.publish = event_bus.publish
+        self.bulk_insert(*initial_values)
 
     def __contains__(self, key):
         node = self.root
@@ -17,8 +18,10 @@ class AVLTree:
             node = node.right if key > node.value else node.left
         return False
 
-    def bulk_insert(self, values):
+    def bulk_insert(self, *values):
         """Inserts values from any iterable."""
+        if len(values) == 1:
+            values = values[0]
         for value in values:
             self.insert(value)
 

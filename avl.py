@@ -25,6 +25,52 @@ class AVLTree:
         for value in values:
             self.insert(value)
 
+    def delete(self, key):
+        """Deletes a key from the AVL tree, or raises if it doesn't exist."""
+        node = self.root
+        while node is not None:
+            if key < node.value:
+                node = node.left
+                continue
+            elif key > node.value:
+                node = node.right
+                continue
+
+            parent = node.parent
+            if node.balance > 0:
+                # Node is right-heavy, find next-larger child node and put its
+                # value on the deletion target. Prune the selected node by
+                # attaching its children to its parent, and rebalance that.
+                closest = subtree_min(node.right)
+                node.value = closest.value
+                if closest is node.right:
+                    node.assign_right(closest.right)
+                    return self.rebalance_removal(node, -1)
+                closest.parent.assign_left(closest.right)
+                return self.rebalance_removal(closest.parent, 1)
+            elif node.left is not None:
+                # Node is left-heavy or balanced. Find the next-smaller child
+                # node and perform same (mirrored) actions as in previous case.
+                closest = subtree_max(node.left)
+                node.value = closest.value
+                if closest is node.left:
+                    node.assign_left(closest.left)
+                    return self.rebalance_removal(node, 1)
+                closest.parent.assign_right(closest.left)
+                return self.rebalance_removal(closest.parent, -1)
+            elif parent is None:
+                # Removal of childless root, which requires no rebalancing.
+                self.root = None
+                return
+            elif node is parent.right:
+                # Removal of childless leaf node, rebalance from node's parent.
+                parent.right = None
+                return self.rebalance_removal(parent, -1)
+            else:
+                parent.left = None
+                return self.rebalance_removal(parent, 1)
+        raise KeyError('key {} does not exist in tree'.format(key))
+
     def insert(self, key):
         if self.root is None:
             self.root = AVLNode(key)
@@ -80,6 +126,32 @@ class AVLTree:
                 grandparent.assign_right(subtree_root)
             self.publish('balanced', tree=self, root=subtree_root)
             break
+
+    def rebalance_removal(self, node, balance_change):
+        node.balance += balance_change
+        while node is not None:
+            parent = node.parent
+            if node.balance == 0 and parent is not None:
+                parent.balance += 1 if node is parent.left else -1
+                node = parent
+                continue
+            elif node.balance in {-1, 0, 1}:
+                return
+            # Determine rotation necessary to rebalance tree
+            elif node.balance > 1:
+                subtree_root = self.rotate_left(node)
+            else:
+                subtree_root = self.rotate_right(node)
+            # Attach rebalanced subtree to grandparent, or tree root
+            if parent is None:
+                self.root = subtree_root
+                self.root.parent = None
+            elif node is parent.left:
+                parent.assign_left(subtree_root)
+            else:
+                parent.assign_right(subtree_root)
+            self.publish('balanced', tree=self, root=subtree_root)
+            node = parent
 
     def rotate_left(self, root):
         pivot = root.right
@@ -193,3 +265,17 @@ class EventBus:
     def unsubscribe(self, handler):
         for handlers in self.subscribers.values():
             handlers.discard(handler)
+
+
+def subtree_max(node):
+    """Returns the rightmost node in the subtree anchored at node."""
+    while node.right is not None:
+        node = node.right
+    return node
+
+
+def subtree_min(node):
+    """Returns the leftmost node in the subtree anchored at node."""
+    while node.left is not None:
+        node = node.left
+    return node

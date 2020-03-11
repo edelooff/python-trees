@@ -16,9 +16,11 @@ def fully_graphed_tree(base_name):
 
 
 def main():
+    tree = fully_graphed_tree('example')
+    tree.bulk_insert([434, 812, 957, 163, 285, 231])
+
     tree = fully_graphed_tree('balanced_inserts')
-    for num in random.sample(range(100, 1000), 32):
-        tree.insert(num)
+    tree.bulk_insert(random.sample(range(100, 1000), 32))
 
 
 if __name__ == '__main__':

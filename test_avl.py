@@ -47,56 +47,31 @@ def test_double_insert_exception(tree):
         tree.insert(5)
 
 
-def test_multi_item_insert(tree):
-    numbers = 8, 6, 10, 7
-    tree.bulk_insert(numbers)
-    for num in numbers:
-        assert num in tree
-
-
-def test_rotate_right(tree):
-    tree.bulk_insert([3, 2, 1])
-    assert tree.root.value == 2
-    assert tree.root.left.value == 1
-    assert tree.root.right.value == 3
-
-
-def test_rotate_left(tree):
-    tree.bulk_insert([1, 2, 3])
-    assert tree.root.value == 2
-    assert tree.root.left.value == 1
-    assert tree.root.right.value == 3
-
-
-def test_rotate_left_right(tree):
-    tree.bulk_insert([3, 1, 2])
-    # Double rotation completed with middle value at root
-    assert tree.root.value == 2
-    assert tree.root.left.value == 1
-    assert tree.root.right.value == 3
+@pytest.mark.parametrize(
+    'insert, expected', [
+        ((1, 2, 3), (2, 1, 3)),  # rotate left
+        ((3, 2, 1), (2, 1, 3)),  # rotate right
+        ((1, 3, 2), (2, 1, 3)),  # rotate right-left
+        ((3, 1, 2), (2, 1, 3)),  # rotate left-right
+    ]
+)
+def test_basic_rotations(Tree, insert, expected):
+    """Tests basic tree rotations and resulting balance."""
+    tree = Tree(insert)
+    root, left, right = expected
+    assert tree.root.value == root
+    assert tree.root.left.value == left
+    assert tree.root.right.value == right
     # Tree should be fully balanced
     assert tree.root.balance == 0
     assert tree.root.left.balance == 0
     assert tree.root.right.balance == 0
 
 
-def test_rotate_right_left(tree):
-    tree.bulk_insert([1, 3, 2])
-    # Double rotation completed with middle value at root
-    assert tree.root.value == 2
-    assert tree.root.left.value == 1
-    assert tree.root.right.value == 3
-    # Tree should be fully balanced
-    assert tree.root.balance == 0
-    assert tree.root.left.balance == 0
-    assert tree.root.right.balance == 0
-
-
-def test_complex(tree):
-    tree.bulk_insert([5, 4, 3, 2, 1])
-    root = tree.root
-    assert root.value == 4
-    assert root.right.value == 5
-    assert root.left.value == 2
-    assert root.left.left.value == 1
-    assert root.left.right.value == 3
+def test_double_rotation(Tree):
+    tree = Tree(5, 4, 3, 2, 1)
+    assert tree.root.value == 4
+    assert tree.root.right.value == 5
+    assert tree.root.left.value == 2
+    assert tree.root.left.left.value == 1
+    assert tree.root.left.right.value == 3

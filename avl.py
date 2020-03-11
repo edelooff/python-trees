@@ -17,6 +17,11 @@ class AVLTree:
             node = node.right if key > node.value else node.left
         return False
 
+    def bulk_insert(self, values):
+        """Inserts values from any iterable."""
+        for value in values:
+            self.insert(value)
+
     def insert(self, key):
         if self.root is None:
             self.root = AVLNode(key)

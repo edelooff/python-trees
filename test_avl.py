@@ -20,34 +20,27 @@ def test_double_insert_exception(tree):
 
 def test_multi_item_insert(tree):
     numbers = 8, 6, 10, 7
-    for num in numbers:
-        tree.insert(num)
+    tree.bulk_insert(numbers)
     for num in numbers:
         assert num in tree
 
 
 def test_rotate_right(tree):
-    tree.insert(3)
-    tree.insert(2)
-    tree.insert(1)
+    tree.bulk_insert([3, 2, 1])
     assert tree.root.value == 2
     assert tree.root.left.value == 1
     assert tree.root.right.value == 3
 
 
 def test_rotate_left(tree):
-    tree.insert(1)
-    tree.insert(2)
-    tree.insert(3)
+    tree.bulk_insert([1, 2, 3])
     assert tree.root.value == 2
     assert tree.root.left.value == 1
     assert tree.root.right.value == 3
 
 
 def test_rotate_left_right(tree):
-    tree.insert(3)
-    tree.insert(1)
-    tree.insert(2)
+    tree.bulk_insert([3, 1, 2])
     # Double rotation completed with middle value at root
     assert tree.root.value == 2
     assert tree.root.left.value == 1
@@ -59,9 +52,7 @@ def test_rotate_left_right(tree):
 
 
 def test_rotate_right_left(tree):
-    tree.insert(1)
-    tree.insert(3)
-    tree.insert(2)
+    tree.bulk_insert([1, 3, 2])
     # Double rotation completed with middle value at root
     assert tree.root.value == 2
     assert tree.root.left.value == 1
@@ -73,8 +64,7 @@ def test_rotate_right_left(tree):
 
 
 def test_complex(tree):
-    for num in (5, 4, 3, 2, 1):
-        tree.insert(num)
+    tree.bulk_insert([5, 4, 3, 2, 1])
     root = tree.root
     assert root.value == 4
     assert root.right.value == 5

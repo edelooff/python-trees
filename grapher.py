@@ -59,80 +59,81 @@ class MarkedNodes:
         return '#{:02x}{:02x}{:02x}'.format(*rgb_color)
 
 
-def draw_marker(graph, node, marker_height):
-    """Draws an invisible marker node to separate left and right children."""
-    source = node.value
-    for _ in range(marker_height):
-        label = f':{source}'
-        graph.add_node(Node(label, label='', width=0, height=0, style='invis'))
-        graph.add_edge(Edge(source, label, style='invis', weight=100))
-        source = label
+class TreeGrapher:
+    def __init__(self, tree, cache_size=256):
+        self._height = self._cached_node_height(cache_size)
+        self.tree = tree
 
-
-def draw_node(graph, node, marked_nodes):
-    """Draws actual node and edge up to parent, thick if imbalanced.
-
-    Alternate colors for marked nodes are determined based on the fill or edge
-    color specified by the `marked_nodes` object.
-    """
-    if node in marked_nodes:
-        graph.add_node(Node(node.value, fillcolor=marked_nodes.fill_color))
-    else:
-        graph.add_node(Node(node.value))
-    if node.parent:
-        style = {'penwidth': 4 if heavy_edge(node) else 2}
-        if node in marked_nodes and node.parent in marked_nodes:
-            style['color'] = marked_nodes.edge_color
-        graph.add_edge(Edge(node.parent.value, node.value, **style))
-
-
-def graph_avl_tree(tree, marked_nodes=None):
-    graph = Dot(**GRAPH_STYLE)
-    graph.set_edge_defaults(color='navy', penwidth=2)
-    graph.set_node_defaults(**NODE_STYLE)
-    marked_nodes = marked_nodes or set()
-    height = node_height()
-    if tree.root is not None:
-        draw_node(graph, tree.root, marked_nodes)
-        nodes = deque([tree.root])
+    def create_graph(self, marked_nodes=None):
+        if self.tree.root is None:
+            raise ValueError('Cannot graph an empty tree')
+        graph = Dot(**GRAPH_STYLE)
+        graph.set_edge_defaults(color='navy', penwidth=2)
+        graph.set_node_defaults(**NODE_STYLE)
+        marked_nodes = marked_nodes or set()
+        self._draw_node(graph, self.tree.root, marked_nodes)
+        nodes = deque([self.tree.root])
         while nodes:
             node = nodes.popleft()
             if node.left:
-                draw_node(graph, node.left, marked_nodes)
+                self._draw_node(graph, node.left, marked_nodes)
                 nodes.append(node.left)
             if node.left or node.right:
-                draw_marker(graph, node, height(node))
+                self._draw_marker(graph, node)
             if node.right:
-                draw_node(graph, node.right, marked_nodes)
+                self._draw_node(graph, node.right, marked_nodes)
                 nodes.append(node.right)
-    return graph
+        return graph
 
+    def _cached_node_height(self, cache_size):
+        """Provides a node-height function to return the height of its subtree.
 
-def heavy_edge(node):
-    """Returns whether the node is on a longer (heavier) branch of the tree.
+        The height is determined recursively by going down the entire subtree.
+        This avoids suboptimal results in trees where balance factors have not
+        been updated yet. A cache ensures that determining the height of all
+        subtrees in the tree only takes time on the order of the node count.
+        """
+        @lru_cache(maxsize=cache_size)
+        def height(node):
+            if node is None:
+                return -1
+            return 1 + max(height(node.left), height(node.right))
+        return height
 
-    To account for edges on newly inserted nodes, where the parent's balance
-    has not been updated, this function explicitly checks for 'only child'
-    situations, in which case the edge is considered 'heavy'.
-    """
-    parent = node.parent
-    if parent is not None:
+    def _draw_marker(self, graph, node):
+        """Draws an invisible line of marker nodes to separate child nodes."""
+        marker_style = {'label': '', 'width': 0, 'height': 0, 'style': 'invis'}
+        source = node.value
+        for _ in range(self._height(node)):
+            label = f':{source}'
+            graph.add_node(Node(label, **marker_style))
+            graph.add_edge(Edge(source, label, style='invis', weight=100))
+            source = label
+
+    def _draw_node(self, graph, node, marked_nodes):
+        """Draws actual node and edge up to parent, thick if imbalanced.
+
+        Alternate colors for marked nodes are determined based on the fill or
+        edge color specified by the `marked_nodes` object.
+        """
+        if node in marked_nodes:
+            graph.add_node(Node(node.value, fillcolor=marked_nodes.fill_color))
+        else:
+            graph.add_node(Node(node.value))
+        if node.parent:
+            style = {'penwidth': 4 if self._tallest_sibling(node) else 2}
+            if node in marked_nodes and node.parent in marked_nodes:
+                style['color'] = marked_nodes.edge_color
+            graph.add_edge(Edge(node.parent.value, node.value, **style))
+
+    def _tallest_sibling(self, node):
+        """Returns whether the node is a taller subtree than its sibling."""
+        parent = node.parent
         if node is parent.left:
-            return parent.balance < 0 or parent.right is None
-        return parent.balance > 0 or parent.left is None
+            return self._height(node) > self._height(parent.right)
+        return self._height(node) > self._height(parent.left)
 
 
-def node_height(cache_size=256):
-    """Returns the height of the largest subtree under this node.
-
-    The height is determined recursively by going down the entire subtree.
-    This avoids suboptimal results in trees where balance factors have not been
-    updated yet. A cache ensures that determining the height of all subtrees
-    in the tree only takes time on the order of the number of nodes.
-    """
-    @lru_cache(maxsize=cache_size)
-    def height(node):
-        if node is None:
-            return -1
-        return 1 + max(height(node.left), height(node.right))
-    return height
+def graph_avl_tree(tree, marked_nodes=None):
+    grapher = TreeGrapher(tree)
+    return grapher.create_graph(marked_nodes=marked_nodes)

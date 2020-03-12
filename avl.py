@@ -36,6 +36,7 @@ class AVLTree:
                 node = node.right
                 continue
 
+            self.publish('delete', tree=self, node=node)
             parent = node.parent
             if node.balance > 0:
                 # Node is right-heavy, find next-larger child node and put its

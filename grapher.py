@@ -26,8 +26,12 @@ class EventAnimator:
         self._frame_count = 0
         self.base_name = base_name
 
+    def graph_delete(self, topic, message):
+        marks = MarkedNodes({message['node']}, hue=0.9)
+        self._write_image(graph_avl_tree(message['tree'], marked_nodes=marks))
+
     def graph_insert(self, topic, message):
-        marks = MarkedNodes({message['node']}, hue=0.3)
+        marks = MarkedNodes({message['node']}, hue=0.4)
         self._write_image(graph_avl_tree(message['tree'], marked_nodes=marks))
 
     def graph_rebalanced(self, topic, message):
@@ -36,7 +40,7 @@ class EventAnimator:
         self._write_image(graph_avl_tree(message['tree'], marked_nodes=marks))
 
     def graph_rotation(self, topic, message):
-        marks = MarkedNodes(message['nodes'], hue=0.9)
+        marks = MarkedNodes(message['nodes'], hue=0.7)
         self._write_image(graph_avl_tree(message['tree'], marked_nodes=marks))
 
     def _write_image(self, graph):
@@ -48,7 +52,7 @@ class MarkedNodes:
     def __init__(self, nodes, hue=0):
         self.nodes = nodes
         self.edge_color = self._create_color(hue, 0.2)
-        self.fill_color = self._create_color(hue, 0.94)
+        self.fill_color = self._create_color(hue, 0.92)
 
     def __contains__(self, other):
         return other in self.nodes

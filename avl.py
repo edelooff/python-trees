@@ -148,8 +148,10 @@ class AVLTree:
                 self.root.parent = None
             elif node is parent.left:
                 parent.assign_left(subtree_root)
+                parent.balance += 1
             else:
                 parent.assign_right(subtree_root)
+                parent.balance -= 1
             self.publish('balanced', tree=self, root=subtree_root)
             node = parent
 

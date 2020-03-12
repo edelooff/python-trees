@@ -169,3 +169,15 @@ def test_delete_single_rotation(Tree, insert, delete, expected):
     assert tree.root.balance == 0
     assert tree.root.left.balance == 0
     assert tree.root.right.balance == 0
+
+
+def test_delete_double_rotation(Tree):
+    """Tests deletion resulting in a double rotation."""
+    tree = Tree(16, 8, 24, 4, 12, 20, 28, 2, 6, 10, 32, 1, 3)
+    tree.delete(20)
+    assert tree.root.value == 8
+    assert tree.root.left.value == 4
+    assert tree.root.right.value == 16
+    assert tree.root.balance == 0
+    assert tree.root.left.balance == -1
+    assert tree.root.right.balance == 0

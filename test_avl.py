@@ -155,6 +155,8 @@ def test_delete_reattach_right(Tree):
     'insert, delete, expected', [
         ((4, 2, 6, 7), 2, (6, 4, 7)),  # rotate left
         ((4, 2, 6, 1), 6, (2, 1, 4)),  # rotate right
+        ((4, 2, 6, 5), 2, (5, 4, 6)),  # rotate right-left
+        ((4, 2, 6, 3), 6, (3, 2, 4)),  # rotate left-right
     ]
 )
 def test_delete_single_rotation(Tree, insert, delete, expected):

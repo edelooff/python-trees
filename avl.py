@@ -140,10 +140,13 @@ class AVLTree:
                 return
             # Determine rotation necessary to rebalance tree
             elif node.balance > 1:
-                subtree_root = self.rotate_left(node)
+                same = node.right.balance >= 0
+                rotate = self.rotate_left if same else self.rotate_right_left
             else:
-                subtree_root = self.rotate_right(node)
+                same = node.left.balance <= 0
+                rotate = self.rotate_right if same else self.rotate_left_right
             # Attach rebalanced subtree to grandparent, or tree root
+            subtree_root = rotate(node)
             if parent is None:
                 self.root = subtree_root
                 self.root.parent = None

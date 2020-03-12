@@ -78,8 +78,7 @@ class TreeGrapher:
             if node.left:
                 self._draw_node(graph, node.left, marked_nodes)
                 nodes.append(node.left)
-            if node.left or node.right:
-                self._draw_marker(graph, node)
+            self._draw_divider(graph, node)
             if node.right:
                 self._draw_node(graph, node.right, marked_nodes)
                 nodes.append(node.right)
@@ -100,8 +99,8 @@ class TreeGrapher:
             return 1 + max(height(node.left), height(node.right))
         return height
 
-    def _draw_marker(self, graph, node):
-        """Draws an invisible line of marker nodes to separate child nodes."""
+    def _draw_divider(self, graph, node):
+        """Draws a vertical divider to distinguish left/right child nodes."""
         marker_style = {'label': '', 'width': 0, 'height': 0, 'style': 'invis'}
         source = node.value
         for _ in range(self._height(node)):

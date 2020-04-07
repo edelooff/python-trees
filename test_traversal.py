@@ -29,8 +29,30 @@ def test_ordered_traversal(in_order_traverser, tree, expected):
     assert list(in_order_traverser(tree)) == expected
 
 
+@pytest.mark.parametrize('tree, child, expected', [
+    (AVLTree(4, 2, 6, 1, 3), 'left', [1, 2, 3]),
+    (AVLTree(4, 2, 6, 5, 7), 'right', [5, 6, 7]),
+    (AVLTree(4, 2, 6, 1), 'left', [1, 2]),
+    (AVLTree(4, 2, 6, 5), 'right', [5, 6]),
+])
+def test_partial_ordered_traversal(in_order_traverser, tree, child, expected):
+    subtree = getattr(tree.root, child)
+    assert list(in_order_traverser(subtree)) == expected
+
+
 @pytest.mark.parametrize('rank_order', [
     [4, 2, 6, 1, 3, 5, 7], [4, 2, 6, 9], [4, 2, 6, 1]])
 def test_rank_ordered_traversal(rank_order):
     tree = AVLTree(rank_order)
     assert list(breadth_first_traverser(tree)) == rank_order
+
+
+@pytest.mark.parametrize('tree, child, expected', [
+    (AVLTree(4, 2, 6, 1, 3), 'left', [2, 1, 3]),
+    (AVLTree(4, 2, 6, 5, 7), 'right', [6, 5, 7]),
+    (AVLTree(4, 2, 6, 1), 'left', [2, 1]),
+    (AVLTree(4, 2, 6, 5), 'right', [6, 5]),
+])
+def test_partial_rank_ordered_traversal(tree, child, expected):
+    subtree = getattr(tree.root, child)
+    assert list(breadth_first_traverser(subtree)) == expected

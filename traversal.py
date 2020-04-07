@@ -1,22 +1,25 @@
 """Basic tree traversal algorithms."""
 
+from collections import deque
+
 
 def ordered_iterative(tree):
     """In-order depth-first-search, implemented as iterative generator."""
     def _traverser(node):
+        backtracking = False
         current = node
-        explored_lefts = {None}
-        parents = [None]
+        parents = deque([None])
         while current is not None:
-            if current.left not in explored_lefts:
+            if not backtracking and current.left is not None:
                 parents.append(current)
                 current = current.left
                 continue
             yield current.value
-            explored_lefts.add(current)
             if current.right is not None:
+                backtracking = False
                 current = current.right
                 continue
+            backtracking = True
             current = parents.pop()
     return _traverse_tree_or_node(_traverser, tree)
 

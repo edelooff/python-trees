@@ -12,6 +12,10 @@ def in_order_traverser(request):
     return request.param
 
 
+def test_empty_tree_traversal(in_order_traverser):
+    assert list(in_order_traverser(AVLTree())) == []
+
+
 @pytest.mark.parametrize('tree, expected', [
     (AVLTree(4, 2, 6, 1, 3, 5, 7), [1, 2, 3, 4, 5, 6, 7]),
     (AVLTree(4, 2, 6, 1, 5, 7), [1, 2, 4, 5, 6, 7]),

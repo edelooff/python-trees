@@ -37,5 +37,5 @@ def ordered_recursive(tree):
 def _traverse_tree_or_node(traverser, node):
     """Applies the traverser to the tree's root, or the given starting node."""
     if hasattr(node, 'root'):
-        return traverser(node.root)
-    return traverser(node)
+        node = node.root
+    return traverser(node) if node is not None else []

@@ -3,6 +3,20 @@
 from collections import deque
 
 
+def breadth_first_traverser(tree):
+    """Rank-ordered breadth-first traverser based on a FIFO-queue."""
+    def _traverser(node):
+        nodes = deque([node])
+        while nodes:
+            node = nodes.popleft()
+            yield node.value
+            if node.left is not None:
+                nodes.append(node.left)
+            if node.right is not None:
+                nodes.append(node.right)
+    return _traverse_tree_or_node(_traverser, tree)
+
+
 def ordered_iterative(tree):
     """In-order depth-first-search, implemented as iterative generator."""
     def _traverser(node):

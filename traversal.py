@@ -7,20 +7,19 @@ def ordered_iterative(tree):
     """In-order depth-first-search, implemented as iterative generator."""
     def _traverser(node):
         backtracking = False
-        current = node
         parents = deque([None])
-        while current is not None:
-            if not backtracking and current.left is not None:
-                parents.append(current)
-                current = current.left
+        while node is not None:
+            if not backtracking and node.left is not None:
+                parents.append(node)
+                node = node.left
                 continue
-            yield current.value
-            if current.right is not None:
+            yield node.value
+            if node.right is not None:
                 backtracking = False
-                current = current.right
+                node = node.right
                 continue
             backtracking = True
-            current = parents.pop()
+            node = parents.pop()
     return _traverse_tree_or_node(_traverser, tree)
 
 

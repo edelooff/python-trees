@@ -40,7 +40,7 @@ class EventAnimator:
 
     def graph_rotation(self, topic, message):
         marks = MarkedNodes(message["nodes"], hue=0.7)
-        self._write_image(graph_avl_tree(message["tree"].root, marked_nodes=marks))
+        self._write_image(graph_avl_tree(message["tree"], marked_nodes=marks))
 
     def _write_image(self, graph):
         graph.write_png(f"{self.base_name}_{self._frame_count}.png")

@@ -3,8 +3,9 @@
 from collections import deque
 
 
-def breadth_first_traverser(tree):
+def breadth_first(tree):
     """Rank-ordered breadth-first traverser based on a FIFO-queue."""
+
     def _traverser(node):
         nodes = deque([node])
         while nodes:
@@ -14,11 +15,13 @@ def breadth_first_traverser(tree):
                 nodes.append(node.left)
             if node.right is not None:
                 nodes.append(node.right)
+
     return _traverse_tree_or_node(_traverser, tree)
 
 
 def ordered_iterative(tree):
     """In-order depth-first-search, implemented as iterative generator."""
+
     def _traverser(node):
         backtracking = False
         parents = deque([None])
@@ -34,22 +37,51 @@ def ordered_iterative(tree):
                 continue
             backtracking = True
             node = parents.pop()
+
     return _traverse_tree_or_node(_traverser, tree)
 
 
-def ordered_recursive(tree):
+def depth_first_inorder(tree):
     """In-order depth-first-search, implemented as recursive generator."""
-    def _traverser(node):
+
+    def _in_order_traverser(node):
         if node.left is not None:
-            yield from ordered_recursive(node.left)
+            yield from _in_order_traverser(node.left)
         yield node.value
         if node.right is not None:
-            yield from ordered_recursive(node.right)
-    return _traverse_tree_or_node(_traverser, tree)
+            yield from _in_order_traverser(node.right)
+
+    return _traverse_tree_or_node(_in_order_traverser, tree)
+
+
+def depth_first_preorder(tree):
+    """Pre-order depth-first-search, implemented as recursive generator."""
+
+    def _pre_order_traverser(node):
+        yield node.value
+        if node.left is not None:
+            yield from _pre_order_traverser(node.left)
+        if node.right is not None:
+            yield from _pre_order_traverser(node.right)
+
+    return _traverse_tree_or_node(_pre_order_traverser, tree)
+
+
+def depth_first_postorder(tree):
+    """Post-order depth-first-search, implemented as recursive generator."""
+
+    def _post_order_traverser(node):
+        if node.left is not None:
+            yield from _post_order_traverser(node.left)
+        if node.right is not None:
+            yield from _post_order_traverser(node.right)
+        yield node.value
+
+    return _traverse_tree_or_node(_post_order_traverser, tree)
 
 
 def _traverse_tree_or_node(traverser, node):
     """Applies the traverser to the tree's root, or the given starting node."""
-    if hasattr(node, 'root'):
+    if hasattr(node, "root"):
         node = node.root
-    return traverser(node) if node is not None else []
+    return iter([]) if node is None else traverser(node)

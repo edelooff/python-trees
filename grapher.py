@@ -79,11 +79,11 @@ class TreeGrapher:
         while nodes:
             node = nodes.popleft()
             if node.left:
-                self._draw_node(graph, node.left, marked_nodes)
+                self._draw_node(graph, node.left, marked_nodes, parent=node)
                 nodes.append(node.left)
             self._draw_divider(graph, node)
             if node.right:
-                self._draw_node(graph, node.right, marked_nodes)
+                self._draw_node(graph, node.right, marked_nodes, parent=node)
                 nodes.append(node.right)
         return graph
 
@@ -114,7 +114,7 @@ class TreeGrapher:
             graph.add_edge(Edge(source, label, style="invis", weight=100))
             source = label
 
-    def _draw_node(self, graph, node, marked_nodes):
+    def _draw_node(self, graph, node, marked_nodes, parent=None):
         """Draws actual node and edge up to parent, thick if imbalanced.
 
         Alternate colors for marked nodes are determined based on the fill or
@@ -124,15 +124,14 @@ class TreeGrapher:
             graph.add_node(Node(node.value, fillcolor=marked_nodes.fill_color))
         else:
             graph.add_node(Node(node.value))
-        if node.parent:
-            style = {"penwidth": 4 if self._tallest_sibling(node) else 2}
-            if node in marked_nodes and node.parent in marked_nodes:
+        if parent is not None:
+            style = {"penwidth": 4 if self._tallest_sibling(parent, node) else 2}
+            if node in marked_nodes and parent in marked_nodes:
                 style["color"] = marked_nodes.edge_color
-            graph.add_edge(Edge(node.parent.value, node.value, **style))
+            graph.add_edge(Edge(parent.value, node.value, **style))
 
-    def _tallest_sibling(self, node):
+    def _tallest_sibling(self, parent, node):
         """Returns whether the node is a taller subtree than its sibling."""
-        parent = node.parent
         if node is parent.left:
             return self._height(node) > self._height(parent.right)
         return self._height(node) > self._height(parent.left)

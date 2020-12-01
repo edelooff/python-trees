@@ -5,10 +5,9 @@ from functools import lru_cache
 from pydot import Dot, Edge, Node
 
 GRAPH_STYLE = {
-    "bgcolor": "white",
-    "graph_type": "graph",
-    "nodesep": 0.2,
-    "pad": "0.5, 0.5, 0, 0.5",
+    "bgcolor": "#ffffff00",
+    "nodesep": 0.3,
+    "ranksep": 0.2,
 }
 NODE_STYLE = {
     "fillcolor": "lightyellow",
@@ -71,7 +70,7 @@ class TreeGrapher:
 
     def create_graph(self, marked_nodes=None):
         graph = Dot(**GRAPH_STYLE)
-        graph.set_edge_defaults(color="navy", penwidth=2)
+        graph.set_edge_defaults(color="navy", dir="none", penwidth=2)
         graph.set_node_defaults(**NODE_STYLE)
         marked_nodes = marked_nodes or set()
         self._draw_node(graph, self.root, marked_nodes)
@@ -107,12 +106,11 @@ class TreeGrapher:
     def _draw_divider(self, graph, node):
         """Draws a vertical divider to distinguish left/right child nodes."""
         marker_style = {"label": "", "width": 0, "height": 0, "style": "invis"}
-        source = node.value
+        target = str(id(node))
         for _ in range(self._height(node)):
-            label = f":{source}"
-            graph.add_node(Node(label, **marker_style))
-            graph.add_edge(Edge(source, label, style="invis", weight=100))
-            source = label
+            parent, target = target, f":{target}"
+            graph.add_node(Node(target, **marker_style))
+            graph.add_edge(Edge(parent, target, style="invis", weight=5))
 
     def _draw_node(self, graph, node, marked_nodes, parent=None):
         """Draws actual node and edge up to parent, thick if imbalanced.
@@ -120,15 +118,15 @@ class TreeGrapher:
         Alternate colors for marked nodes are determined based on the fill or
         edge color specified by the `marked_nodes` object.
         """
+        node_options = {"label": str(node.value)}
         if node in marked_nodes:
-            graph.add_node(Node(node.value, fillcolor=marked_nodes.fill_color))
-        else:
-            graph.add_node(Node(node.value))
+            node_options["fillcolor"] = marked_nodes.fill_color
+        graph.add_node(Node(str(id(node)), **node_options))
         if parent is not None:
             style = {"penwidth": 4 if self._tallest_sibling(parent, node) else 2}
             if node in marked_nodes and parent in marked_nodes:
                 style["color"] = marked_nodes.edge_color
-            graph.add_edge(Edge(parent.value, node.value, **style))
+            graph.add_edge(Edge(str(id(parent)), str(id(node)), **style))
 
     def _tallest_sibling(self, parent, node):
         """Returns whether the node is a taller subtree than its sibling."""

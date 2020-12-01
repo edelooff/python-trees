@@ -93,6 +93,31 @@ def construct_from_preorder_inorder(pre_order, in_order):
     return root
 
 
+def preorder_permutation_generator(preorder):
+    """Generates different structural permutations for a single preorder sequence."""
+    root, *additional = map(Node, preorder)
+
+    def _constructor(root, nodes):
+        if not nodes:
+            yield root
+            return
+        cursor = root
+        while True:
+            while cursor.right is not None:
+                cursor = cursor.right
+            cursor.right = nodes[0]
+            yield from _constructor(root, nodes[1:])
+            cursor.right = None
+            if cursor.left is None:
+                cursor.left = nodes[0]
+                yield from _constructor(root, nodes[1:])
+                cursor.left = None
+                return
+            cursor = cursor.left
+
+    return _constructor(root, additional)
+
+
 def main():
     seed(1)
     dfsio = depth_first_inorder

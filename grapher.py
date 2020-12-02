@@ -1,6 +1,7 @@
 from collections import deque
 from colorsys import hls_to_rgb
 from functools import lru_cache
+from typing import Callable
 
 from pydot import Dot, Edge, Node
 
@@ -20,121 +21,147 @@ NODE_STYLE = {
 
 
 class EventAnimator:
-    def __init__(self, base_name):
+    def __init__(self, base_name: str):
         self._frame_count = 0
         self.base_name = base_name
 
-    def graph_delete(self, topic, message):
+    def graph_delete(self, topic, message) -> None:
         marks = MarkedNodes({message["node"]}, hue=0.9)
-        self._write_image(graph_avl_tree(message["tree"], marked_nodes=marks))
+        self._write_image(tree_graph(message["tree"], marked_nodes=marks))
 
-    def graph_insert(self, topic, message):
+    def graph_insert(self, topic, message) -> None:
         marks = MarkedNodes({message["node"]}, hue=0.4)
-        self._write_image(graph_avl_tree(message["tree"], marked_nodes=marks))
+        self._write_image(tree_graph(message["tree"], marked_nodes=marks))
 
-    def graph_rebalanced(self, topic, message):
+    def graph_rebalanced(self, topic, message) -> None:
         root = message["root"]
         marks = MarkedNodes({root, root.left, root.right}, hue=0.6)
-        self._write_image(graph_avl_tree(message["tree"], marked_nodes=marks))
+        self._write_image(tree_graph(message["tree"], marked_nodes=marks))
 
-    def graph_rotation(self, topic, message):
+    def graph_rotation(self, topic, message) -> None:
         marks = MarkedNodes(message["nodes"], hue=0.7)
-        self._write_image(graph_avl_tree(message["tree"], marked_nodes=marks))
+        self._write_image(tree_graph(message["tree"], marked_nodes=marks))
 
-    def _write_image(self, graph):
+    def _write_image(self, graph) -> None:
         graph.write_png(f"{self.base_name}_{self._frame_count}.png")
         self._frame_count += 1
 
 
 class MarkedNodes:
-    def __init__(self, nodes, hue=0):
+    def __init__(self, nodes, hue: float = 0):
         self.nodes = nodes
         self.edge_color = self._create_color(hue, 0.2)
         self.fill_color = self._create_color(hue, 0.92)
 
-    def __contains__(self, other):
+    def __contains__(self, other) -> bool:
         return other in self.nodes
 
+    def __ge__(self, other) -> bool:
+        if isinstance(other, type(self)):
+            return other.nodes <= self.nodes
+        elif isinstance(other, set):
+            return other <= self.nodes
+        return NotImplemented
+
     @staticmethod
-    def _create_color(hue, lightness):
+    def _create_color(hue, lightness) -> str:
         rgb_color = (round(val * 255) for val in hls_to_rgb(hue, lightness, 1))
         return "#{:02x}{:02x}{:02x}".format(*rgb_color)
 
 
-class TreeGrapher:
-    def __init__(self, root, cache_size=256):
-        if root is None:
-            raise ValueError("Cannot graph an empty tree")
-        self._height = self._cached_node_height(cache_size)
-        self.root = root
+def cached_node_height(cache_size: int) -> Callable:
+    """Provides a node-height function to return the height of its subtree.
 
-    def create_graph(self, marked_nodes=None):
-        graph = Dot(**GRAPH_STYLE)
-        graph.set_edge_defaults(color="navy", dir="none", penwidth=2)
-        graph.set_node_defaults(**NODE_STYLE)
-        marked_nodes = marked_nodes or set()
-        self._draw_node(graph, self.root, marked_nodes)
-        nodes = deque([self.root])
-        while nodes:
-            node = nodes.popleft()
-            if node.left:
-                self._draw_node(graph, node.left, marked_nodes, parent=node)
-                nodes.append(node.left)
-            self._draw_divider(graph, node)
-            if node.right:
-                self._draw_node(graph, node.right, marked_nodes, parent=node)
-                nodes.append(node.right)
-        return graph
+    The height is determined recursively by going down the entire subtree.
+    This avoids suboptimal results in trees where balance factors have not
+    been updated yet. A cache ensures that determining the height of all
+    subtrees in the tree only takes time on the order of the node count.
+    """
 
-    def _cached_node_height(self, cache_size):
-        """Provides a node-height function to return the height of its subtree.
+    @lru_cache(maxsize=cache_size)
+    def height(node) -> int:
+        if node is None:
+            return -1
+        return 1 + max(height(node.left), height(node.right))
 
-        The height is determined recursively by going down the entire subtree.
-        This avoids suboptimal results in trees where balance factors have not
-        been updated yet. A cache ensures that determining the height of all
-        subtrees in the tree only takes time on the order of the node count.
-        """
+    return height
 
-        @lru_cache(maxsize=cache_size)
-        def height(node):
-            if node is None:
-                return -1
-            return 1 + max(height(node.left), height(node.right))
 
-        return height
+def tree_graph(tree, *, marked_nodes=None, draw_height_imbalance=True) -> Dot:
+    """Returns a Dot graph for the tree starting at the given node.
 
-    def _draw_divider(self, graph, node):
-        """Draws a vertical divider to distinguish left/right child nodes."""
-        marker_style = {"label": "", "width": 0, "height": 0, "style": "invis"}
+    An optional selection of marked nodes will be graphed in a different fill
+    color, as defined by the MarkedNodes instance. The `draw_height_imbalance`
+    parameter controls whether children that start a taller subtree should be
+    drawn with an emphasized edge.
+    """
+    graph = Dot(**GRAPH_STYLE)
+    graph.set_edge_defaults(color="navy", dir="none", penwidth=2)
+    graph.set_node_defaults(**NODE_STYLE)
+    node_height = cached_node_height(1024)
+    draw_divider = _divider_drawer(graph, node_height)
+    draw_node = _node_drawer(
+        graph,
+        marked_nodes=marked_nodes,
+        height=node_height if draw_height_imbalance else None,
+    )
+    root = tree.root if hasattr(tree, "root") else tree
+    draw_node(root, None)
+    nodes = deque([root])
+    while nodes:
+        node = nodes.popleft()
+        if node.left:
+            draw_node(node.left, node)
+            nodes.append(node.left)
+        draw_divider(node)
+        if node.right:
+            draw_node(node.right, node)
+            nodes.append(node.right)
+    return graph
+
+
+def _divider_drawer(graph: Dot, height: Callable) -> Callable:
+    """Draws a vertical divider to distinguish left/right child nodes."""
+    marker_style = {"label": "", "width": 0, "height": 0, "style": "invis"}
+
+    def _divider(node) -> None:
         target = str(id(node))
-        for _ in range(self._height(node)):
+        for _ in range(height(node)):
             parent, target = target, f":{target}"
             graph.add_node(Node(target, **marker_style))
             graph.add_edge(Edge(parent, target, style="invis", weight=5))
 
-    def _draw_node(self, graph, node, marked_nodes, parent=None):
-        """Draws actual node and edge up to parent, thick if imbalanced.
+    return _divider
 
-        Alternate colors for marked nodes are determined based on the fill or
-        edge color specified by the `marked_nodes` object.
-        """
+
+def _node_drawer(graph: Dot, *, marked_nodes=None, height=None) -> Callable:
+    """Returns a node drawing function, for the given graph and marked nodes.
+
+    The returned function will draw the actual Dot node, and when given
+    a parent node, an edge from the parent down to the target node.
+
+    Alternate colors for marked nodes are determined based on the fill or
+    edge color specified by the `marked_nodes` object.
+    """
+
+    def _tallest_child(node, parent) -> bool:
+        """Returns whether the node is the tallest child of its parent."""
+        if height is None:
+            return True
+        elif node is parent.left:
+            return height(node) > height(parent.right)
+        else:
+            return height(node) > height(parent.left)
+
+    def _draw(node, parent) -> None:
         node_options = {"label": str(node.value)}
-        if node in marked_nodes:
+        if marked_nodes is not None and node in marked_nodes:
             node_options["fillcolor"] = marked_nodes.fill_color
         graph.add_node(Node(str(id(node)), **node_options))
         if parent is not None:
-            style = {"penwidth": 4 if self._tallest_sibling(parent, node) else 2}
-            if node in marked_nodes and parent in marked_nodes:
+            style = {"penwidth": 4 if _tallest_child(node, parent) else 2}
+            if marked_nodes is not None and {node, parent} <= marked_nodes:
                 style["color"] = marked_nodes.edge_color
             graph.add_edge(Edge(str(id(parent)), str(id(node)), **style))
 
-    def _tallest_sibling(self, parent, node):
-        """Returns whether the node is a taller subtree than its sibling."""
-        if node is parent.left:
-            return self._height(node) > self._height(parent.right)
-        return self._height(node) > self._height(parent.left)
-
-
-def graph_avl_tree(tree, marked_nodes=None):
-    grapher = TreeGrapher(tree.root)
-    return grapher.create_graph(marked_nodes=marked_nodes)
+    return _draw

@@ -27,57 +27,45 @@ class AVLTree:
 
     def delete(self, key):
         """Deletes a key from the AVL tree, or raises if it doesn't exist."""
-        node = self.root
-        lineage = [None]
-        while node is not None:
-            if key < node.value:
-                lineage.append(node)
-                node = node.left
-                continue
-            elif key > node.value:
-                lineage.append(node)
-                node = node.right
-                continue
-
-            self.publish("delete", tree=self, node=node)
-            if node.balance > 0:
-                # Node is right-heavy, find next-larger child node and put its
-                # value on the deletion target. Prune the selected node by
-                # attaching its children to its parent, and rebalance that.
-                *subtree_lineage, closest = ledt_edge_path(node.right)
-                lineage.extend(subtree_lineage)
-                node.value = closest.value
-                if closest is node.right:
-                    node.right = closest.right
-                    return self.rebalance_removal(node, reversed(lineage), -1)
-                closest_parent = lineage.pop()
-                closest_parent.left = closest.right
-                return self.rebalance_removal(closest_parent, reversed(lineage), 1)
-            elif node.left is not None:
-                # Node is left-heavy or balanced. Find the next-smaller child
-                # node and perform same (mirrored) actions as in previous case.
-                *subtree_lineage, closest = right_edge_path(node.left)
-                lineage.extend(subtree_lineage)
-                node.value = closest.value
-                if closest is node.left:
-                    node.left = closest.left
-                    return self.rebalance_removal(node, reversed(lineage), 1)
-                closest_parent = lineage.pop()
-                closest_parent.right = closest.left
-                return self.rebalance_removal(closest_parent, reversed(lineage), -1)
-            parent = lineage.pop()
-            if parent is None:
-                # Removal of childless root, which requires no rebalancing.
-                self.root = None
-                return
-            elif node is parent.right:
-                # Removal of childless leaf node, rebalance from node's parent.
-                parent.right = None
-                return self.rebalance_removal(parent, reversed(lineage), -1)
-            else:
-                parent.left = None
-                return self.rebalance_removal(parent, reversed(lineage), 1)
-        raise KeyError(f"key {key!r} does not exist in tree")
+        *lineage, node = self._trace(key)
+        self.publish("delete", tree=self, node=node)
+        if node.balance > 0:
+            # Node is right-heavy, find next-larger child node and put its
+            # value on the deletion target. Prune the selected node by
+            # attaching its children to its parent, and rebalance that.
+            lineage.extend(ledt_edge_path(node.right))
+            tail = lineage.pop()
+            node.value = tail.value
+            if tail is node.right:
+                node.right = tail.right
+                return self.rebalance_removal(node, reversed(lineage), -1)
+            closest_parent = lineage.pop()
+            closest_parent.left = tail.right
+            return self.rebalance_removal(closest_parent, reversed(lineage), 1)
+        elif node.left is not None:
+            # Node is left-heavy or balanced. Find the next-smaller child
+            # node and perform same (mirrored) actions as in previous case.
+            lineage.extend(right_edge_path(node.left))
+            tail = lineage.pop()
+            node.value = tail.value
+            if tail is node.left:
+                node.left = tail.left
+                return self.rebalance_removal(node, reversed(lineage), 1)
+            closest_parent = lineage.pop()
+            closest_parent.right = tail.left
+            return self.rebalance_removal(closest_parent, reversed(lineage), -1)
+        parent = lineage.pop()
+        if parent is None:
+            # Removal of childless root, which requires no rebalancing.
+            self.root = None
+            return
+        elif node is parent.right:
+            # Removal of childless leaf node, rebalance from node's parent.
+            parent.right = None
+            return self.rebalance_removal(parent, reversed(lineage), -1)
+        else:
+            parent.left = None
+            return self.rebalance_removal(parent, reversed(lineage), 1)
 
     def insert(self, key):
         if self.root is None:
@@ -104,6 +92,20 @@ class AVLTree:
             self.publish("insert", tree=self, node=new)
             self.rebalance(new, reversed(lineage))
             return new
+
+    def _trace(self, key):
+        """Traces a path from the root down to the requested key, or raises KeyError."""
+        node = self.root
+        yield None
+        while node is not None:
+            yield node
+            if key == node.value:
+                return
+            elif key < node.value:
+                node = node.left
+            else:
+                node = node.right
+        raise KeyError(f"key {key!r} does not exist in tree")
 
     # #########################################################################
     # Tree rebalancing and rotating

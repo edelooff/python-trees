@@ -169,12 +169,8 @@ class AVLTree:
         self.publish("rotate.left", tree=self, nodes={root, pivot})
         root.right = pivot.left
         pivot.left = root
-        if pivot.balance == 0:
-            root.balance = 1
-            pivot.balance = -1
-        else:
-            root.balance = 0
-            pivot.balance = 0
+        pivot.balance -= 1
+        root.balance = pivot.balance * -1
         return pivot
 
     def rotate_right(self, root):
@@ -182,12 +178,8 @@ class AVLTree:
         self.publish("rotate.right", tree=self, nodes={root, pivot})
         root.left = pivot.right
         pivot.right = root
-        if pivot.balance == 0:
-            root.balance = -1
-            pivot.balance = 1
-        else:
-            root.balance = 0
-            pivot.balance = 0
+        pivot.balance += 1
+        root.balance = pivot.balance * -1
         return pivot
 
     def rotate_left_right(self, root):

@@ -36,7 +36,7 @@ class AVLTree:
                 node = node.right
                 continue
 
-            self.publish('delete', tree=self, node=node)
+            self.publish("delete", tree=self, node=node)
             parent = node.parent
             if node.balance > 0:
                 # Node is right-heavy, find next-larger child node and put its
@@ -70,18 +70,18 @@ class AVLTree:
             else:
                 parent.left = None
                 return self.rebalance_removal(parent, 1)
-        raise KeyError('key {} does not exist in tree'.format(key))
+        raise KeyError(f"key {key!r} does not exist in tree")
 
     def insert(self, key):
         if self.root is None:
             self.root = AVLNode(key)
-            self.publish('insert', tree=self, node=self.root)
+            self.publish("insert", tree=self, node=self.root)
             return self.root
 
         node = self.root
         while True:
             if key == node.value:
-                raise ValueError('duplicate key in AVL Tree')
+                raise ValueError(f"duplicate key {key!r} in AVL Tree")
             elif key < node.value:
                 if node.left is not None:
                     node = node.left
@@ -92,7 +92,7 @@ class AVLTree:
                     node = node.right
                     continue
                 node.right = new = AVLNode(key, parent=node)
-            self.publish('insert', tree=self, node=new)
+            self.publish("insert", tree=self, node=new)
             self.rebalance(new)
             return new
 
@@ -125,7 +125,7 @@ class AVLTree:
                 grandparent.assign_left(subtree_root)
             else:
                 grandparent.assign_right(subtree_root)
-            self.publish('balanced', tree=self, root=subtree_root)
+            self.publish("balanced", tree=self, root=subtree_root)
             break
 
     def rebalance_removal(self, node, balance_change):
@@ -156,12 +156,12 @@ class AVLTree:
             else:
                 parent.assign_right(subtree_root)
                 parent.balance -= 1
-            self.publish('balanced', tree=self, root=subtree_root)
+            self.publish("balanced", tree=self, root=subtree_root)
             node = parent
 
     def rotate_left(self, root):
         pivot = root.right
-        self.publish('rotate.left', tree=self, nodes={root, pivot})
+        self.publish("rotate.left", tree=self, nodes={root, pivot})
         root.assign_right(pivot.left)
         pivot.assign_left(root)
         if pivot.balance == 0:
@@ -174,7 +174,7 @@ class AVLTree:
 
     def rotate_right(self, root):
         pivot = root.left
-        self.publish('rotate.right', tree=self, nodes={root, pivot})
+        self.publish("rotate.right", tree=self, nodes={root, pivot})
         root.assign_left(pivot.right)
         pivot.assign_right(root)
         if pivot.balance == 0:
@@ -188,8 +188,7 @@ class AVLTree:
     def rotate_left_right(self, root):
         smallest = root.left
         pivot = smallest.right
-        self.publish('rotate.leftright', tree=self, nodes={
-            root, pivot, smallest})
+        self.publish("rotate.leftright", tree=self, nodes={root, pivot, smallest})
         smallest.assign_right(pivot.left)
         root.assign_left(pivot.right)
         pivot.assign_left(smallest)
@@ -209,8 +208,7 @@ class AVLTree:
     def rotate_right_left(self, root):
         smallest = root.right
         pivot = smallest.left
-        self.publish('rotate.rightleft', tree=self, nodes={
-            root, pivot, smallest})
+        self.publish("rotate.rightleft", tree=self, nodes={root, pivot, smallest})
         smallest.assign_left(pivot.right)
         root.assign_right(pivot.left)
         pivot.assign_left(root)
@@ -237,7 +235,7 @@ class AVLNode:
         self.balance = 0
 
     def __repr__(self):
-        return f'<AVLNode(value={self.value!r})>'
+        return f"<AVLNode(value={self.value!r})>"
 
     def assign_left(self, child):
         self.left = child
@@ -252,6 +250,7 @@ class AVLNode:
 
 class EventBus:
     """A trivial pub/sub model to allow observation of tree internals."""
+
     def __init__(self):
         self.subscribers = {}
 
@@ -260,12 +259,13 @@ class EventBus:
         while topic:
             for handler in self.subscribers.get(topic, ()):
                 handler(full_topic, message)
-            topic, _, _ = topic.rpartition('.')
+            topic, _, _ = topic.rpartition(".")
 
     def subscribe(self, topic, handler=None):
         def _wrapper(handler):
             self.subscribers.setdefault(topic, set()).add(handler)
             return handler
+
         return _wrapper if handler is None else _wrapper(handler)
 
     def unsubscribe(self, handler):

@@ -33,7 +33,7 @@ class AVLTree:
             # Node is right-heavy, find next-larger child node and put its
             # value on the deletion target. Prune the selected node by
             # attaching its children to its parent, and rebalance that.
-            lineage.extend(ledt_edge_path(node.right))
+            lineage.extend(left_edge_path(node.right))
             tail = lineage.pop()
             node.value = tail.value
             if tail is node.right:
@@ -269,7 +269,7 @@ def right_edge_path(node):
     yield node
 
 
-def ledt_edge_path(node):
+def left_edge_path(node):
     """Yields the given node and all children attached on a left edge."""
     while node.left is not None:
         yield node

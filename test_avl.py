@@ -150,16 +150,6 @@ def test_delete_reattach(Tree):
     assert tree.root.left.value == 1
 
 
-def test_delete_reattach_right(Tree):
-    """Removing the root from a 2-depth V should reattach nodes correctly."""
-    tree = Tree(3, 2, 4, 5)
-    tree.delete(3)
-    assert 3 not in tree
-    assert tree.root.value == 4
-    assert tree.root.right.value == 5
-    assert tree.root.left.value == 2
-
-
 @pytest.mark.parametrize(
     "insert, delete, expected",
     [

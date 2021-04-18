@@ -6,7 +6,7 @@ class AVLTree:
         self.root = None
         if event_bus is None:
             self.publish = lambda topic, **msg: None
-        else:
+        else:  # pragma: no cover
             self.publish = event_bus.publish
         self.bulk_insert(*initial_values)
 
@@ -159,10 +159,12 @@ class AVLTree:
                 self.root = subtree_root
             elif node is parent.left:
                 parent.left = subtree_root
-                parent.balance += 1
+                if subtree_root.balance == 0:
+                    parent.balance += 1
             else:
                 parent.right = subtree_root
-                parent.balance -= 1
+                if subtree_root.balance == 0:
+                    parent.balance -= 1
             self.publish("balanced", tree=self, root=subtree_root)
             node = parent
 
@@ -232,11 +234,11 @@ class AVLNode:
         self.right = None
         self.balance = 0
 
-    def __repr__(self):
+    def __repr__(self):  # pragma: no cover
         return f"<AVLNode(value={self.value!r})>"
 
 
-class EventBus:
+class EventBus:  # pragma: no cover
     """A trivial pub/sub model to allow observation of tree internals."""
 
     def __init__(self):

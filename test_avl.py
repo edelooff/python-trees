@@ -24,6 +24,18 @@ def assert_avl_invariants(node):
         assert_avl_invariants(node.right)
 
 
+def in_order(tree):
+    """Returns an in-order tree traversal as a list."""
+
+    def _traversal(node):
+        if node is not None:
+            yield from _traversal(node.left)
+            yield node.value
+            yield from _traversal(node.right)
+
+    return list(_traversal(tree.root))
+
+
 def pre_order(tree):
     """Returns a pre-order tree traversal as a list."""
 
@@ -143,11 +155,12 @@ def test_delete_trivial(Tree, insert, delete, expected):
 @pytest.mark.parametrize(
     "insert, deletes, expected",
     [
-        ([2, 1, 3], [2], [1, 3]),  # Implementation-defined, prefer left node
-        ([3, 2, 4, 1, 5], [2, 4], [3, 1, 5]),
-        ([3, 2, 4, 1, 5], [3, 4], [2, 1, 5]),
-        ([3, 1, 5, 2, 4], [1, 5], [3, 2, 4]),
-        ([4, 2, 6, 1, 3, 5], [4, 1, 6], [3, 2, 5]),
+        pytest.param([4, 2, 6, 1, 7], [2, 6], [4, 1, 7], id="remove middle from lines"),
+        pytest.param([4, 2, 6, 3, 5], [2, 6], [4, 3, 5], id="remove middle from bends"),
+        pytest.param([4, 2, 6, 1, 7], [4, 6], [2, 1, 7], id="remove root and left"),
+        pytest.param([4, 2, 6, 1, 7], [4, 2], [6, 1, 7], id="remove root and right"),
+        pytest.param([4, 2, 6, 1, 3, 5], [4, 2, 6], [3, 1, 5], id="hoist left (b)"),
+        pytest.param([4, 2, 6, 1, 5, 7], [4, 2, 6], [5, 1, 7], id="hoist right (b)"),
     ],
 )
 def test_delete_attach_without_rotation(Tree, insert, deletes, expected):
@@ -197,4 +210,47 @@ def test_delete_double_rotation(Tree):
     assert tree.root.value == 8
     assert tree.root.left.value == 4
     assert tree.root.right.value == 16
+    assert_avl_invariants(tree.root)
+
+
+@pytest.mark.parametrize(
+    "insert, delete",
+    [
+        pytest.param([8, 4, 12, 2, 6, 14, 1], 6, id="right rot: left-heavy tail"),
+        pytest.param([8, 4, 12, 2, 6, 14, 3], 6, id="right rot: right-heavy tail"),
+        pytest.param([8, 4, 12, 2, 6, 14, 1, 3], 6, id="right rot: balanced tail"),
+        pytest.param([8, 4, 12, 2, 10, 14, 13], 10, id="left rot: left-heavy tail"),
+        pytest.param([8, 4, 12, 2, 10, 14, 15], 10, id="left rot: right-heavy tail"),
+        pytest.param([8, 4, 12, 2, 10, 14, 13, 15], 10, id="left rot: balanced tail"),
+    ],
+)
+def test_delete_rotation_under_root(Tree, insert, delete):
+    tree = Tree(insert)
+    tree.delete(delete)
+    assert delete not in tree
+    expected = sorted(insert)
+    expected.remove(delete)
+    assert in_order(tree) == expected
+    assert_avl_invariants(tree.root)
+
+
+@pytest.mark.parametrize(
+    "insert, delete",
+    [
+        pytest.param([8, 4, 12, 2, 6, 14, 5], 14, id="left-right: left-heavy"),
+        pytest.param([8, 4, 12, 2, 6, 14, 7], 14, id="left-right: right-heavy"),
+        pytest.param([8, 4, 12, 2, 6, 14, 5, 7], 14, id="left-right: balanced"),
+        pytest.param([8, 4, 12, 2, 10, 14, 9], 2, id="right-left: left-heavy"),
+        pytest.param([8, 4, 12, 2, 10, 14, 11], 2, id="right-left: right-heavy"),
+        pytest.param([8, 4, 12, 2, 10, 14, 9, 11], 2, id="right-left: balanced"),
+    ],
+)
+def test_two_way_rotations_with_subtree_at_pivot(Tree, insert, delete):
+    """Deletion causes a LR or RL rotation and the new subtree root has children."""
+    tree = Tree(insert)
+    tree.delete(delete)
+    assert delete not in tree
+    expected = sorted(insert)
+    expected.remove(delete)
+    assert in_order(tree) == expected
     assert_avl_invariants(tree.root)

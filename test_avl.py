@@ -222,6 +222,8 @@ def test_delete_double_rotation(Tree):
         pytest.param([8, 4, 12, 2, 10, 14, 13], 10, id="left rot: left-heavy tail"),
         pytest.param([8, 4, 12, 2, 10, 14, 15], 10, id="left rot: right-heavy tail"),
         pytest.param([8, 4, 12, 2, 10, 14, 13, 15], 10, id="left rot: balanced tail"),
+        pytest.param([6, 4, 8, 2, 7, 10, 9, 11], 7, id="propagate balance left child"),
+        pytest.param([6, 4, 8, 2, 5, 7, 1, 3], 6, id="propagate balance right child"),
     ],
 )
 def test_delete_rotation_under_root(Tree, insert, delete):

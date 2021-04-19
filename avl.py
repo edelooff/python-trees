@@ -33,26 +33,29 @@ class AVLTree:
             # Node is right-heavy, find next-larger child node and put its
             # value on the deletion target. Prune the selected node by
             # attaching its children to its parent, and rebalance that.
-            lineage.extend(left_edge_path(node.right))
-            tail = lineage.pop()
+            *subtree_lineage, tail = left_edge_path(node.right)
             node.value = tail.value
             if tail is node.right:
                 node.right = tail.right
+                assert len(subtree_lineage) == 0
                 return self.rebalance_removal(node, reversed(lineage), -1)
-            closest_parent = lineage.pop()
+            closest_parent = subtree_lineage.pop()
             closest_parent.left = tail.right
+            lineage.append(node)
+            lineage.extend(subtree_lineage)
             return self.rebalance_removal(closest_parent, reversed(lineage), 1)
         elif node.left is not None:
             # Node is left-heavy or balanced. Find the next-smaller child
             # node and perform same (mirrored) actions as in previous case.
-            lineage.extend(right_edge_path(node.left))
-            tail = lineage.pop()
+            *subtree_lineage, tail = right_edge_path(node.left)
             node.value = tail.value
             if tail is node.left:
                 node.left = tail.left
                 return self.rebalance_removal(node, reversed(lineage), 1)
-            closest_parent = lineage.pop()
+            closest_parent = subtree_lineage.pop()
             closest_parent.right = tail.left
+            lineage.append(node)
+            lineage.extend(subtree_lineage)
             return self.rebalance_removal(closest_parent, reversed(lineage), -1)
         parent = lineage.pop()
         if parent is None:
@@ -155,16 +158,17 @@ class AVLTree:
                 rotate = self.rotate_right if same else self.rotate_left_right
             # Attach rebalanced subtree to grandparent, or tree root
             subtree_root = rotate(node)
+            balance_change = 1 - abs(subtree_root.balance)
             if parent is None:
                 self.root = subtree_root
             elif node is parent.left:
                 parent.left = subtree_root
-                if subtree_root.balance == 0:
-                    parent.balance += 1
+                parent.balance += balance_change
             else:
                 parent.right = subtree_root
-                if subtree_root.balance == 0:
-                    parent.balance -= 1
+                parent.balance -= balance_change
+            if balance_change == 0:
+                break  # Subtree height did not change, rebalancing is done
             self.publish("balanced", tree=self, root=subtree_root)
             node = parent
 

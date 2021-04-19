@@ -1,5 +1,12 @@
 """AVL Tree in Python."""
 
+from enum import Enum, auto
+
+
+class Branch(Enum):
+    left = auto()
+    right = auto()
+
 
 class AVLTree:
     def __init__(self, *initial_values, event_bus=None):
@@ -37,28 +44,24 @@ class AVLTree:
             *subtree, tail = left_edge_path(node.right)
             lineage.extend(subtree)
             node.value = tail.value
-            if tail is node.right:
-                return self.rebalance_removal(lineage, balance=-1, attach=tail.right)
-            return self.rebalance_removal(lineage, balance=1, attach=tail.right)
+            deleted = Branch.right if tail is node.right else Branch.left
+            return self.rebalance_removal(lineage, deleted=deleted, new=tail.right)
         elif node.left is not None:
             # Node is left-heavy or balanced. Find the next-smaller child
             # node and perform same (mirrored) actions as in previous case.
             *subtree, tail = right_edge_path(node.left)
             lineage.extend(subtree)
             node.value = tail.value
-            if tail is node.left:
-                return self.rebalance_removal(lineage, balance=1, attach=tail.left)
-            return self.rebalance_removal(lineage, balance=-1, attach=tail.left)
+            deleted = Branch.left if tail is node.left else Branch.right
+            return self.rebalance_removal(lineage, deleted=deleted, new=tail.left)
         parent = lineage[-2]
         if parent is None:
             # Removal of childless root, which requires no rebalancing.
             self.root = None
             return
-        elif node is parent.right:
-            # Removal of childless leaf node, rebalance from node's parent.
-            return self.rebalance_removal(lineage[:-1], balance=-1)
-        else:
-            return self.rebalance_removal(lineage[:-1], balance=1)
+        # Removal of childless leaf node, rebalance from node's parent.
+        deleted = Branch.left if node is parent.left else Branch.right
+        return self.rebalance_removal(lineage[:-1], deleted=deleted)
 
     def insert(self, key):
         if self.root is None:
@@ -130,15 +133,15 @@ class AVLTree:
             self.publish("balanced", tree=self, root=subtree_root)
             break
 
-    def rebalance_removal(self, lineage, *, balance, attach=None):
-        lineage = reversed(lineage)
-        node = next(lineage)
-        node.balance += balance
-        if balance < 0:
-            node.right = attach
+    def rebalance_removal(self, lineage, *, deleted, new=None):
+        node = lineage.pop()
+        if deleted is Branch.left:
+            node.balance += 1
+            node.left = new
         else:
-            node.left = attach
-        for parent in lineage:
+            node.balance -= 1
+            node.right = new
+        for parent in reversed(lineage):
             if node.balance == 0 and parent is not None:
                 parent.balance += 1 if node is parent.left else -1
                 node = parent

@@ -172,60 +172,44 @@ class AVLTree:
             node = parent
 
     def rotate_left(self, root):
+        """Hoists the right child to this node's parent position."""
         pivot = root.right
         self.publish("rotate.left", tree=self, nodes={root, pivot})
-        root.right = pivot.left
-        pivot.left = root
+        root.right, pivot.left = pivot.left, root
         pivot.balance -= 1
         root.balance = pivot.balance * -1
         return pivot
 
     def rotate_right(self, root):
+        """Hoists the left child to this node's parent position."""
         pivot = root.left
         self.publish("rotate.right", tree=self, nodes={root, pivot})
-        root.left = pivot.right
-        pivot.right = root
+        root.left, pivot.right = pivot.right, root
         pivot.balance += 1
         root.balance = pivot.balance * -1
         return pivot
 
     def rotate_left_right(self, root):
+        """Hoists the left->right grandchild to this node's parent position."""
         smallest = root.left
         pivot = smallest.right
         self.publish("rotate.leftright", tree=self, nodes={root, pivot, smallest})
-        smallest.right = pivot.left
-        root.left = pivot.right
-        pivot.left = smallest
-        pivot.right = root
-        if pivot.balance < 0:
-            root.balance = 1
-            smallest.balance = 0
-        elif pivot.balance > 0:
-            root.balance = 0
-            smallest.balance = -1
-        else:
-            root.balance = 0
-            smallest.balance = 0
+        smallest.right, root.left = pivot.left, pivot.right
+        pivot.left, pivot.right = smallest, root
+        root.balance = int(pivot.balance < 0)
+        smallest.balance = -int(pivot.balance > 0)
         pivot.balance = 0
         return pivot
 
     def rotate_right_left(self, root):
-        smallest = root.right
-        pivot = smallest.left
-        self.publish("rotate.rightleft", tree=self, nodes={root, pivot, smallest})
-        smallest.left = pivot.right
-        root.right = pivot.left
-        pivot.left = root
-        pivot.right = smallest
-        if pivot.balance < 0:
-            root.balance = 0
-            smallest.balance = 1
-        elif pivot.balance > 0:
-            root.balance = -1
-            smallest.balance = 0
-        else:
-            root.balance = 0
-            smallest.balance = 0
+        """Hoists the right->left grandchild to this node's parent position."""
+        largest = root.right
+        pivot = largest.left
+        self.publish("rotate.rightleft", tree=self, nodes={root, pivot, largest})
+        root.right, largest.left = pivot.left, pivot.right
+        pivot.left, pivot.right = root, largest
+        root.balance = -int(pivot.balance > 0)
+        largest.balance = int(pivot.balance < 0)
         pivot.balance = 0
         return pivot
 

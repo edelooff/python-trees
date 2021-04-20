@@ -36,7 +36,7 @@ class AVLTree:
         """Deletes a key from the AVL tree, or raises if it doesn't exist."""
         lineage = list(self._trace(key))
         node = lineage[-1]
-        self.publish("delete", tree=self, node=node)
+        self.publish("delete", tree=self.root, node=node)
         if node.balance > 0:
             # Node is right-heavy, find next-larger child node and put its
             # value on the deletion target. Prune the selected node by
@@ -66,7 +66,7 @@ class AVLTree:
     def insert(self, key):
         if self.root is None:
             self.root = AVLNode(key)
-            self.publish("insert", tree=self, node=self.root)
+            self.publish("insert", tree=self.root, node=self.root)
             return self.root
 
         node = self.root
@@ -85,7 +85,7 @@ class AVLTree:
                     node = node.right
                     continue
                 node.right = new = AVLNode(key)
-            self.publish("insert", tree=self, node=new)
+            self.publish("insert", tree=self.root, node=new)
             self.rebalance(new, reversed(lineage))
             return new
 
@@ -130,7 +130,7 @@ class AVLTree:
                 grandparent.left = subtree_root
             else:
                 grandparent.right = subtree_root
-            self.publish("balanced", tree=self, root=subtree_root)
+            self.publish("balanced", tree=self.root, root=subtree_root)
             break
 
     def rebalance_removal(self, lineage, *, deleted, new=None):
@@ -168,13 +168,13 @@ class AVLTree:
                 parent.balance -= balance_change
             if balance_change == 0:
                 break  # Subtree height did not change, rebalancing is done
-            self.publish("balanced", tree=self, root=subtree_root)
+            self.publish("balanced", tree=self.root, root=subtree_root)
             node = parent
 
     def rotate_left(self, root):
         """Hoists the right child to this node's parent position."""
         pivot = root.right
-        self.publish("rotate.left", tree=self, nodes={root, pivot})
+        self.publish("rotate.left", tree=self.root, nodes={root, pivot})
         root.right, pivot.left = pivot.left, root
         pivot.balance -= 1
         root.balance = pivot.balance * -1
@@ -183,7 +183,7 @@ class AVLTree:
     def rotate_right(self, root):
         """Hoists the left child to this node's parent position."""
         pivot = root.left
-        self.publish("rotate.right", tree=self, nodes={root, pivot})
+        self.publish("rotate.right", tree=self.root, nodes={root, pivot})
         root.left, pivot.right = pivot.right, root
         pivot.balance += 1
         root.balance = pivot.balance * -1
@@ -193,7 +193,7 @@ class AVLTree:
         """Hoists the left->right grandchild to this node's parent position."""
         smallest = root.left
         pivot = smallest.right
-        self.publish("rotate.leftright", tree=self, nodes={root, pivot, smallest})
+        self.publish("rotate.leftright", tree=self.root, nodes={root, pivot, smallest})
         smallest.right, root.left = pivot.left, pivot.right
         pivot.left, pivot.right = smallest, root
         root.balance = int(pivot.balance < 0)
@@ -205,7 +205,7 @@ class AVLTree:
         """Hoists the right->left grandchild to this node's parent position."""
         largest = root.right
         pivot = largest.left
-        self.publish("rotate.rightleft", tree=self, nodes={root, pivot, largest})
+        self.publish("rotate.rightleft", tree=self.root, nodes={root, pivot, largest})
         root.right, largest.left = pivot.left, pivot.right
         pivot.left, pivot.right = root, largest
         root.balance = -int(pivot.balance > 0)

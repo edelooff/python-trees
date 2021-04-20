@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 from collections import deque
 from colorsys import hls_to_rgb
 from functools import lru_cache
+from multiprocessing import Pool
 from typing import Callable
 
 from pydot import Dot, Edge, Node
@@ -24,27 +27,40 @@ class EventAnimator:
     def __init__(self, base_name: str):
         self._frame_count = 0
         self.base_name = base_name
+        self.workers = Pool()
 
     def graph_delete(self, topic, message) -> None:
-        marks = MarkedNodes({message["node"]}, hue=0.9)
-        self._write_image(tree_graph(message["tree"], marked_nodes=marks))
+        self._render(message["tree"], MarkedNodes({message["node"]}, hue=0.9))
 
     def graph_insert(self, topic, message) -> None:
-        marks = MarkedNodes({message["node"]}, hue=0.4)
-        self._write_image(tree_graph(message["tree"], marked_nodes=marks))
+        self._render(message["tree"], MarkedNodes({message["node"]}, hue=0.4))
 
     def graph_rebalanced(self, topic, message) -> None:
         root = message["root"]
         marks = MarkedNodes({root, root.left, root.right}, hue=0.6)
-        self._write_image(tree_graph(message["tree"], marked_nodes=marks))
+        self._render(message["tree"], marks)
 
     def graph_rotation(self, topic, message) -> None:
-        marks = MarkedNodes(message["nodes"], hue=0.7)
-        self._write_image(tree_graph(message["tree"], marked_nodes=marks))
+        self._render(message["tree"], MarkedNodes(message["nodes"], hue=0.7))
 
-    def _write_image(self, graph) -> None:
-        graph.write_png(f"{self.base_name}_{self._frame_count}.png")
+    def _render(self, root, marked_nodes: MarkedNodes) -> None:
+        self.workers.apply_async(self.draw_graph, (root, marked_nodes, self.frame_name))
+
+    @property
+    def frame_name(self):
         self._frame_count += 1
+        return f"{self.base_name}_{self._frame_count}.png"
+
+    def finish(self):
+        """Closes the worker pool for additional jobs and waits for them to finish."""
+        self.workers.close()
+        self.workers.join()
+
+    @staticmethod
+    def draw_graph(tree, marked_nodes, name):
+        """Multiprocess worker function to do the actual work of image rendering."""
+        graph = tree_graph(tree, marked_nodes=marked_nodes)
+        graph.write_png(name)
 
 
 class MarkedNodes:
@@ -87,7 +103,7 @@ def cached_node_height(cache_size: int) -> Callable:
     return height
 
 
-def tree_graph(tree, *, marked_nodes=None, draw_height_imbalance=True) -> Dot:
+def tree_graph(root, *, marked_nodes=None, draw_height_imbalance=True) -> Dot:
     """Returns a Dot graph for the tree starting at the given node.
 
     An optional selection of marked nodes will be graphed in a different fill
@@ -105,7 +121,6 @@ def tree_graph(tree, *, marked_nodes=None, draw_height_imbalance=True) -> Dot:
         marked_nodes=marked_nodes,
         height=node_height if draw_height_imbalance else None,
     )
-    root = tree.root if hasattr(tree, "root") else tree
     draw_node(root, None)
     nodes = deque([root])
     while nodes:

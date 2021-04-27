@@ -1,6 +1,7 @@
 """AVL Tree in Python."""
 
 from enum import Enum, auto
+from typing import Callable, Dict, NamedTuple, Set
 
 
 class Branch(Enum):
@@ -12,7 +13,7 @@ class AVLTree:
     def __init__(self, *initial_values, event_bus=None):
         self.root = None
         if event_bus is None:
-            self.publish = lambda topic, **msg: None
+            self.publish = lambda topic, event: None
         else:  # pragma: no cover
             self.publish = event_bus.publish
         self.bulk_insert(*initial_values)
@@ -36,7 +37,7 @@ class AVLTree:
         """Deletes a key from the AVL tree, or raises if it doesn't exist."""
         lineage = list(self._trace(key))
         node = lineage[-1]
-        self.publish("delete", tree=self.root, node=node)
+        self.publish("delete", Event(self.root, {node}))
         if node.balance > 0:
             # Node is right-heavy, find next-larger child node and put its
             # value on the deletion target. Prune the selected node by
@@ -66,7 +67,7 @@ class AVLTree:
     def insert(self, key):
         if self.root is None:
             self.root = AVLNode(key)
-            self.publish("insert", tree=self.root, node=self.root)
+            self.publish("insert", Event(self.root, {self.root}))
             return self.root
 
         node = self.root
@@ -85,7 +86,7 @@ class AVLTree:
                     node = node.right
                     continue
                 node.right = new = AVLNode(key)
-            self.publish("insert", tree=self.root, node=new)
+            self.publish("insert", Event(self.root, {new}))
             self.rebalance(new, reversed(lineage))
             return new
 
@@ -123,14 +124,16 @@ class AVLTree:
                 rotate = self.rotate_right if same else self.rotate_left_right
             # Attach rebalanced subtree to grandparent, or tree root
             grandparent = next(lineage, None)
-            subtree_root = rotate(parent)
+            subtree = rotate(parent)
             if grandparent is None:
-                self.root = subtree_root
+                self.root = subtree
             elif parent is grandparent.left:
-                grandparent.left = subtree_root
+                grandparent.left = subtree
             else:
-                grandparent.right = subtree_root
-            self.publish("balanced", tree=self.root, root=subtree_root)
+                grandparent.right = subtree
+            self.publish(
+                "balanced", Event(self.root, {subtree, subtree.left, subtree.right})
+            )
             break
 
     def rebalance_removal(self, lineage, *, deleted, new=None):
@@ -156,25 +159,28 @@ class AVLTree:
                 same = node.left.balance <= 0
                 rotate = self.rotate_right if same else self.rotate_left_right
             # Attach rebalanced subtree to grandparent, or tree root
-            subtree_root = rotate(node)
-            balance_change = 1 - abs(subtree_root.balance)
+            subtree = rotate(node)
+            balance_change = 1 - abs(subtree.balance)
             if parent is None:
-                self.root = subtree_root
+                self.root = subtree
             elif node is parent.left:
-                parent.left = subtree_root
+                parent.left = subtree
                 parent.balance += balance_change
             else:
-                parent.right = subtree_root
+                parent.right = subtree
                 parent.balance -= balance_change
+            self.publish(
+                "balanced",
+                Event(self.root, {subtree, subtree.left, subtree.right}),
+            )
             if balance_change == 0:
                 break  # Subtree height did not change, rebalancing is done
-            self.publish("balanced", tree=self.root, root=subtree_root)
             node = parent
 
     def rotate_left(self, root):
         """Hoists the right child to this node's parent position."""
         pivot = root.right
-        self.publish("rotate.left", tree=self.root, nodes={root, pivot})
+        self.publish("rotate.left", Event(self.root, {root, pivot}))
         root.right, pivot.left = pivot.left, root
         pivot.balance -= 1
         root.balance = pivot.balance * -1
@@ -183,7 +189,7 @@ class AVLTree:
     def rotate_right(self, root):
         """Hoists the left child to this node's parent position."""
         pivot = root.left
-        self.publish("rotate.right", tree=self.root, nodes={root, pivot})
+        self.publish("rotate.right", Event(self.root, {root, pivot}))
         root.left, pivot.right = pivot.right, root
         pivot.balance += 1
         root.balance = pivot.balance * -1
@@ -193,7 +199,7 @@ class AVLTree:
         """Hoists the left->right grandchild to this node's parent position."""
         smallest = root.left
         pivot = smallest.right
-        self.publish("rotate.leftright", tree=self.root, nodes={root, pivot, smallest})
+        self.publish("rotate.leftright", Event(self.root, {root, pivot, smallest}))
         smallest.right, root.left = pivot.left, pivot.right
         pivot.left, pivot.right = smallest, root
         root.balance = int(pivot.balance < 0)
@@ -205,7 +211,7 @@ class AVLTree:
         """Hoists the right->left grandchild to this node's parent position."""
         largest = root.right
         pivot = largest.left
-        self.publish("rotate.rightleft", tree=self.root, nodes={root, pivot, largest})
+        self.publish("rotate.rightleft", Event(self.root, {root, pivot, largest}))
         root.right, largest.left = pivot.left, pivot.right
         pivot.left, pivot.right = root, largest
         root.balance = -int(pivot.balance > 0)
@@ -225,17 +231,22 @@ class AVLNode:
         return f"<AVLNode(value={self.value!r})>"
 
 
+class Event(NamedTuple):
+    root: AVLNode
+    nodes: Set[AVLNode]
+
+
 class EventBus:  # pragma: no cover
     """A trivial pub/sub model to allow observation of tree internals."""
 
     def __init__(self):
-        self.subscribers = {}
+        self.subscribers: Dict[str, Callable[str, Event], None] = {}
 
-    def publish(self, topic, **message):
+    def publish(self, topic: str, event: Event) -> None:
         full_topic = topic
         while topic:
             for handler in self.subscribers.get(topic, ()):
-                handler(full_topic, message)
+                handler(full_topic, event)
             topic, _, _ = topic.rpartition(".")
 
     def subscribe(self, topic, handler=None):

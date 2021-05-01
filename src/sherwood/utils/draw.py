@@ -2,22 +2,12 @@ from __future__ import annotations
 
 from collections import deque
 from colorsys import hls_to_rgb
-from dataclasses import dataclass
 from functools import lru_cache
-from multiprocessing import Pool
-from typing import (
-    Any,
-    Callable,
-    Iterator,
-    List,
-    NamedTuple,
-    Optional,
-    Set,
-    Tuple,
-    Union,
-)
+from typing import Any, Callable, Dict, Optional, Set, Union
 
 from pydot import Dot, Edge, Node
+
+from ..trees.base import Node as BinaryNode
 
 GRAPH_STYLE = {
     "bgcolor": "#ffffff00",
@@ -34,114 +24,11 @@ NODE_STYLE = {
 }
 
 
-class BinaryNode:
-    def __init__(self, value: Any):
-        self.value = value
-        self.left: Optional[BinaryNode] = None
-        self.right: Optional[BinaryNode] = None
-
-
 # Type helpers
+DotStyle = Dict[str, Union[int, str]]
 NodeDividerDrawer = Callable[[BinaryNode], None]
 NodeDrawer = Callable[[BinaryNode, Optional[BinaryNode]], None]
 NodeHeight = Callable[[Optional[BinaryNode]], int]
-
-
-@dataclass
-class AnimationFrame:
-    root: BinaryNode
-    highlighted_nodes: Set[BinaryNode]
-    highlight_hue: float = 0
-
-    @classmethod
-    def from_serialized(cls, frame: SerialFrame) -> AnimationFrame:
-        ivalues = iter(frame.serialization)
-        root = node = BinaryNode(next(ivalues))
-        marked_nodes = {root} if 0 in frame.node_indices else set()
-        stack = []
-        for idx, (branch_id, value) in enumerate(zip(ivalues, ivalues), 1):
-            if branch_id == 0:
-                stack.append(node)
-                node.left = node = BinaryNode(value)
-            else:
-                for _ in range(1, branch_id):
-                    node = stack.pop()
-                node.right = node = BinaryNode(value)
-            if idx in frame.node_indices:
-                marked_nodes.add(node)
-        return cls(root, marked_nodes, frame.hue)
-
-    def serialize(self) -> SerialFrame:
-        serialization, node_indices = [], []
-        cur_branch = 0
-        for node_index, (node, new_branch) in enumerate(dfs_branch_encoded(self.root)):
-            if node in self.marked_nodes:
-                node_indices.append(node_index)
-            change, cur_branch = 1 + cur_branch - new_branch, new_branch
-            serialization.append(change)
-            serialization.append(node.value)
-        return SerialFrame(serialization[1:], node_indices, self.highlight_hue)
-
-    @property
-    def marked_nodes(self) -> MarkedNodes:
-        return MarkedNodes(self.highlighted_nodes, hue=self.highlight_hue)
-
-    def render(self, name: str) -> None:
-        graph = tree_graph(self.root, marked_nodes=self.marked_nodes)
-        graph.write_png(name)
-
-
-class SerialFrame(NamedTuple):
-    serialization: List[Union[Any, int]]
-    node_indices: List[int]
-    hue: float
-
-
-def dfs_branch_encoded(
-    node: Optional[BinaryNode], branch_id: int = 0
-) -> Iterator[Tuple[BinaryNode, int]]:
-    if node is not None:
-        yield node, branch_id
-        yield from dfs_branch_encoded(node.left, branch_id=branch_id + 1)
-        yield from dfs_branch_encoded(node.right, branch_id=branch_id)
-
-
-class EventAnimator:
-    def __init__(self, base_name: str):
-        self._frame_count = 0
-        self.base_name = base_name
-        self.workers = Pool()
-
-    def graph_delete(self, topic: str, event: Any) -> None:
-        self._render(AnimationFrame(event.root, event.nodes, highlight_hue=0.9))
-
-    def graph_insert(self, topic: str, event: Any) -> None:
-        self._render(AnimationFrame(event.root, event.nodes, highlight_hue=0.4))
-
-    def graph_rebalanced(self, topic: str, event: Any) -> None:
-        self._render(AnimationFrame(event.root, event.nodes, highlight_hue=0.6))
-
-    def graph_rotation(self, topic: str, event: Any) -> None:
-        self._render(AnimationFrame(event.root, event.nodes, highlight_hue=0.7))
-
-    def _render(self, frame: AnimationFrame) -> None:
-        self.workers.apply_async(self.draw_graph, (frame.serialize(), self.frame_name))
-
-    @property
-    def frame_name(self) -> str:
-        self._frame_count += 1
-        return f"{self.base_name}_{self._frame_count}.png"
-
-    def finish(self) -> None:
-        """Closes the worker pool for additional jobs and waits for them to finish."""
-        self.workers.close()
-        self.workers.join()
-
-    @staticmethod
-    def draw_graph(serialized_frame: SerialFrame, name: str) -> None:
-        """Multiprocess worker function to do the actual work of image rendering."""
-        frame = AnimationFrame.from_serialized(serialized_frame)
-        frame.render(name)
 
 
 class MarkedNodes:
@@ -264,7 +151,7 @@ def _node_drawer(
             node_options["fillcolor"] = marked_nodes.fill_color
         graph.add_node(Node(str(id(node)), **node_options))
         if parent is not None:
-            style = {"penwidth": 4 if _tallest_child(node, parent) else 2}
+            style: DotStyle = {"penwidth": 4 if _tallest_child(node, parent) else 2}
             if {node, parent} <= marked_nodes:
                 style["color"] = marked_nodes.edge_color
             graph.add_edge(Edge(str(id(parent)), str(id(node)), **style))

@@ -50,7 +50,7 @@ def pre_order(tree):
 
 @pytest.fixture
 def Tree():
-    from avl import AVLTree
+    from sherwood.trees.avl import AVLTree
 
     return AVLTree
 

@@ -1,7 +1,7 @@
 import pytest
 
-from avl import AVLTree
-from traversal import breadth_first, depth_first_inorder, ordered_iterative
+from sherwood.traversal import breadth_first, depth_first_inorder, ordered_iterative
+from sherwood.trees.avl import AVLTree
 
 
 @pytest.fixture(params=[depth_first_inorder, ordered_iterative])

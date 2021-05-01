@@ -1,16 +1,17 @@
 """AVL Tree in Python."""
 
-from enum import Enum, auto
-from typing import Callable, Dict, NamedTuple, Set
+from typing import Optional
+
+from ..events import Bus, Event
+from .base import Branch, Node
 
 
-class Branch(Enum):
-    left = auto()
-    right = auto()
+class AVLNode(Node):
+    balance: Optional[int] = 0
 
 
 class AVLTree:
-    def __init__(self, *initial_values, event_bus=None):
+    def __init__(self, *initial_values, event_bus: Optional[Bus] = None):
         self.root = None
         if event_bus is None:
             self.publish = lambda topic, event: None
@@ -18,7 +19,7 @@ class AVLTree:
             self.publish = event_bus.publish
         self.bulk_insert(*initial_values)
 
-    def __contains__(self, key):
+    def __contains__(self, key) -> bool:
         node = self.root
         while node is not None:
             if key == node.value:
@@ -218,47 +219,6 @@ class AVLTree:
         largest.balance = int(pivot.balance < 0)
         pivot.balance = 0
         return pivot
-
-
-class AVLNode:
-    def __init__(self, value):
-        self.value = value
-        self.left = None
-        self.right = None
-        self.balance = 0
-
-    def __repr__(self):  # pragma: no cover
-        return f"<AVLNode(value={self.value!r})>"
-
-
-class Event(NamedTuple):
-    root: AVLNode
-    nodes: Set[AVLNode]
-
-
-class EventBus:  # pragma: no cover
-    """A trivial pub/sub model to allow observation of tree internals."""
-
-    def __init__(self):
-        self.subscribers: Dict[str, Callable[str, Event], None] = {}
-
-    def publish(self, topic: str, event: Event) -> None:
-        full_topic = topic
-        while topic:
-            for handler in self.subscribers.get(topic, ()):
-                handler(full_topic, event)
-            topic, _, _ = topic.rpartition(".")
-
-    def subscribe(self, topic, handler=None):
-        def _wrapper(handler):
-            self.subscribers.setdefault(topic, set()).add(handler)
-            return handler
-
-        return _wrapper if handler is None else _wrapper(handler)
-
-    def unsubscribe(self, handler):
-        for handlers in self.subscribers.values():
-            handlers.discard(handler)
 
 
 def right_edge_path(node):

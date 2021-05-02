@@ -6,7 +6,7 @@ from multiprocessing import Pool
 from types import TracebackType
 from typing import Any, Iterator, List, NamedTuple, Optional, Set, Tuple, Type, Union
 
-from ..trees.base import Node
+from ..trees.base import Node, Tree
 from ..utils.draw import MarkedNodes, tree_graph
 from .base import Bus, Event
 
@@ -125,7 +125,7 @@ def dfs_branch_encoded(
 
 
 @contextmanager
-def tree_renderer(tree_type: Type, base_name: str):
+def tree_renderer(tree_type: Type[Tree], base_name: str) -> Iterator[Tree]:
     animator = Animator(base_name)
     with animator as bus:
         yield tree_type(event_bus=bus)

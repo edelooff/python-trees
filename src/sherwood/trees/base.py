@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
+
+if TYPE_CHECKING:
+    from ..events import Bus, Event
 
 
 class Branch(Enum):
@@ -21,3 +25,21 @@ class Node:
 
     def __repr__(self) -> str:
         return f"<{type(self).__name__}(value={self.value!r}) @ {hex(id(self))}>"
+
+
+class Tree(ABC):
+    bus: Optional[Bus]
+    root: Optional[Node]
+
+    def __init__(self, *initial_values: Any, event_bus: Optional[Bus] = None):
+        self.bus = event_bus
+        self.root = None
+        self.bulk_insert(*initial_values)
+
+    @abstractmethod
+    def bulk_insert(self, *values: Any) -> None:
+        ...
+
+    def publish(self, name: str, event: Event) -> None:
+        if self.bus is not None:
+            self.bus.publish(name, event)

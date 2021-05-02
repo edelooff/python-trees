@@ -1,25 +1,23 @@
 """AVL Tree in Python."""
+from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Iterator, List, Optional, cast
 
-from ..events import Bus, Event
-from .base import Branch, Node
+from ..events import Event
+from .base import Branch, Node, Tree
 
 
 class AVLNode(Node):
-    balance: Optional[int] = 0
+    value: Any
+    balance: int = 0
+    left: Optional[AVLNode] = None
+    right: Optional[AVLNode] = None
 
 
-class AVLTree:
-    def __init__(self, *initial_values, event_bus: Optional[Bus] = None):
-        self.root = None
-        if event_bus is None:
-            self.publish = lambda topic, event: None
-        else:  # pragma: no cover
-            self.publish = event_bus.publish
-        self.bulk_insert(*initial_values)
+class AVLTree(Tree):
+    root: Optional[AVLNode]
 
-    def __contains__(self, key) -> bool:
+    def __contains__(self, key: Any) -> bool:
         node = self.root
         while node is not None:
             if key == node.value:
@@ -27,23 +25,23 @@ class AVLTree:
             node = node.right if key > node.value else node.left
         return False
 
-    def bulk_insert(self, *values):
+    def bulk_insert(self, *values: Any) -> None:
         """Inserts values from any iterable."""
         if len(values) == 1:
             values = values[0]
         for value in values:
             self.insert(value)
 
-    def delete(self, key):
+    def delete(self, key: Any) -> None:
         """Deletes a key from the AVL tree, or raises if it doesn't exist."""
         lineage = list(self._trace(key))
-        node = lineage[-1]
+        node = cast(AVLNode, lineage[-1])
         self.publish("delete", Event(self.root, {node}))
         if node.balance > 0:
             # Node is right-heavy, find next-larger child node and put its
             # value on the deletion target. Prune the selected node by
             # attaching its children to its parent, and rebalance that.
-            *subtree, tail = left_edge_path(node.right)
+            *subtree, tail = left_edge_path(cast(AVLNode, node.right))
             lineage.extend(subtree)
             node.value = tail.value
             deleted = Branch.right if tail is node.right else Branch.left
@@ -65,7 +63,7 @@ class AVLTree:
         deleted = Branch.left if node is parent.left else Branch.right
         return self.rebalance_removal(lineage[:-1], deleted=deleted)
 
-    def insert(self, key):
+    def insert(self, key: Any) -> AVLNode:
         if self.root is None:
             self.root = AVLNode(key)
             self.publish("insert", Event(self.root, {self.root}))
@@ -91,7 +89,7 @@ class AVLTree:
             self.rebalance(new, reversed(lineage))
             return new
 
-    def _trace(self, key):
+    def _trace(self, key: Any) -> Iterator[Optional[AVLNode]]:
         """Traces a path from the root down to the requested key, or raises KeyError."""
         node = self.root
         yield None
@@ -108,7 +106,7 @@ class AVLTree:
     # #########################################################################
     # Tree rebalancing and rotating
     #
-    def rebalance(self, node, lineage):
+    def rebalance(self, node: AVLNode, lineage: Iterator[AVLNode]) -> None:
         for parent in lineage:
             parent.balance += -1 if node is parent.left else 1
             if parent.balance == 0:
@@ -137,8 +135,14 @@ class AVLTree:
             )
             break
 
-    def rebalance_removal(self, lineage, *, deleted, new=None):
-        node = lineage.pop()
+    def rebalance_removal(
+        self,
+        lineage: List[Optional[AVLNode]],
+        *,
+        deleted: Branch,
+        new: Optional[AVLNode] = None,
+    ) -> None:
+        node = cast(AVLNode, lineage.pop())
         if deleted is Branch.left:
             node.balance += 1
             node.left = new
@@ -154,10 +158,10 @@ class AVLTree:
                 return
             # Determine rotation necessary to rebalance tree
             elif node.balance > 1:
-                same = node.right.balance >= 0
+                same = node.right.balance >= 0  # type: ignore[union-attr]
                 rotate = self.rotate_left if same else self.rotate_right_left
             else:
-                same = node.left.balance <= 0
+                same = node.left.balance <= 0  # type: ignore[union-attr]
                 rotate = self.rotate_right if same else self.rotate_left_right
             # Attach rebalanced subtree to grandparent, or tree root
             subtree = rotate(node)
@@ -176,30 +180,30 @@ class AVLTree:
             )
             if balance_change == 0:
                 break  # Subtree height did not change, rebalancing is done
-            node = parent
+            node = cast(AVLNode, parent)
 
-    def rotate_left(self, root):
+    def rotate_left(self, root: AVLNode) -> AVLNode:
         """Hoists the right child to this node's parent position."""
-        pivot = root.right
+        pivot = cast(AVLNode, root.right)
         self.publish("rotate.left", Event(self.root, {root, pivot}))
         root.right, pivot.left = pivot.left, root
         pivot.balance -= 1
         root.balance = pivot.balance * -1
         return pivot
 
-    def rotate_right(self, root):
+    def rotate_right(self, root: AVLNode) -> AVLNode:
         """Hoists the left child to this node's parent position."""
-        pivot = root.left
+        pivot = cast(AVLNode, root.left)
         self.publish("rotate.right", Event(self.root, {root, pivot}))
         root.left, pivot.right = pivot.right, root
         pivot.balance += 1
         root.balance = pivot.balance * -1
         return pivot
 
-    def rotate_left_right(self, root):
+    def rotate_left_right(self, root: AVLNode) -> AVLNode:
         """Hoists the left->right grandchild to this node's parent position."""
-        smallest = root.left
-        pivot = smallest.right
+        smallest = cast(AVLNode, root.left)
+        pivot = cast(AVLNode, smallest.right)
         self.publish("rotate.leftright", Event(self.root, {root, pivot, smallest}))
         smallest.right, root.left = pivot.left, pivot.right
         pivot.left, pivot.right = smallest, root
@@ -208,10 +212,10 @@ class AVLTree:
         pivot.balance = 0
         return pivot
 
-    def rotate_right_left(self, root):
+    def rotate_right_left(self, root: AVLNode) -> AVLNode:
         """Hoists the right->left grandchild to this node's parent position."""
-        largest = root.right
-        pivot = largest.left
+        largest = cast(AVLNode, root.right)
+        pivot = cast(AVLNode, largest.left)
         self.publish("rotate.rightleft", Event(self.root, {root, pivot, largest}))
         root.right, largest.left = pivot.left, pivot.right
         pivot.left, pivot.right = root, largest
@@ -221,7 +225,7 @@ class AVLTree:
         return pivot
 
 
-def right_edge_path(node):
+def right_edge_path(node: AVLNode) -> Iterator[AVLNode]:
     """Yields the given node and all children attached on a right edge."""
     while node.right is not None:
         yield node
@@ -229,7 +233,7 @@ def right_edge_path(node):
     yield node
 
 
-def left_edge_path(node):
+def left_edge_path(node: AVLNode) -> Iterator[AVLNode]:
     """Yields the given node and all children attached on a left edge."""
     while node.left is not None:
         yield node

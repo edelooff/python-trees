@@ -10,11 +10,14 @@ class Event(NamedTuple):
     nodes: Set[Node]
 
 
+EventHandler = Callable[[str, Event], None]
+
+
 class Bus:
     """A trivial pub/sub model to allow observation of tree internals."""
 
-    def __init__(self):
-        self.subscribers: Dict[str, Callable[str, Event], None] = {}
+    def __init__(self) -> None:
+        self.subscribers: Dict[str, Set[EventHandler]] = {}
 
     def publish(self, topic: str, event: Event) -> None:
         full_topic = topic
@@ -23,13 +26,9 @@ class Bus:
                 handler(full_topic, event)
             topic, _, _ = topic.rpartition(".")
 
-    def subscribe(self, topic, handler=None):
-        def _wrapper(handler):
-            self.subscribers.setdefault(topic, set()).add(handler)
-            return handler
+    def subscribe(self, topic: str, handler: EventHandler) -> None:
+        self.subscribers.setdefault(topic, set()).add(handler)
 
-        return _wrapper if handler is None else _wrapper(handler)
-
-    def unsubscribe(self, handler):
+    def unsubscribe(self, handler: EventHandler) -> None:
         for handlers in self.subscribers.values():
             handlers.discard(handler)

@@ -1,7 +1,7 @@
 import random
 
-from sherwood.trees.avl import AVLTree
 from sherwood.events.animator import tree_renderer
+from sherwood.trees.avl import AVLTree
 
 
 def main():

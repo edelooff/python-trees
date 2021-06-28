@@ -56,13 +56,6 @@ def test_tree_insert():
     assert 5 in tree
 
 
-def test_tree_bulk_insert():
-    tree = AVLTree()
-    tree.bulk_insert([1, 2])
-    assert 1 in tree
-    assert 2 in tree
-
-
 def test_instantiate_from_list():
     tree = AVLTree([1, 2])
     assert 1 in tree
@@ -75,14 +68,15 @@ def test_instantiate_from_iter():
     assert 2 in tree
 
 
-def test_instantiate_from_params():
-    tree = AVLTree(1, 2)
-    assert 1 in tree
-    assert 2 in tree
+def test_instantiate_from_string():
+    tree = AVLTree("abc")
+    assert "a" in tree
+    assert "b" in tree
+    assert "c" in tree
 
 
 def test_double_insert_exception():
-    tree = AVLTree(5)
+    tree = AVLTree([5])
     with pytest.raises(ValueError):
         tree.insert(5)
 
@@ -104,21 +98,21 @@ def test_basic_rotations(insert, expected):
 
 
 def test_double_rotation():
-    tree = AVLTree(5, 4, 3, 2, 1)
+    tree = AVLTree([5, 4, 3, 2, 1])
     assert_avl_invariants(tree.root)
     assert pre_order(tree) == [4, 2, 1, 3, 5]
 
 
 def test_delete_nonexisting():
     """Tests deletion of nonexisting key raises KeyError."""
-    tree = AVLTree(1)
+    tree = AVLTree()
     with pytest.raises(KeyError):
         tree.delete(2)
 
 
 def test_delete_root():
     """Tests deletion of singular root node."""
-    tree = AVLTree(1)
+    tree = AVLTree([1])
     tree.delete(1)
     assert 1 not in tree
     assert tree.root is None
@@ -167,7 +161,7 @@ def test_delete_attach_without_rotation(insert, deletes, expected):
 
 def test_delete_reattach():
     """Removing the root from a 2-depth V should reattach nodes correctly."""
-    tree = AVLTree(3, 2, 4, 1, 5)
+    tree = AVLTree([3, 2, 4, 1, 5])
     tree.delete(3)
     assert 3 not in tree
     assert pre_order(tree) == [2, 1, 4, 5]
@@ -196,7 +190,7 @@ def test_delete_single_rotation(insert, delete, expected):
 
 def test_delete_double_rotation():
     """Tests deletion resulting in a double rotation."""
-    tree = AVLTree(16, 8, 24, 4, 12, 20, 28, 2, 6, 10, 32, 1, 3)
+    tree = AVLTree([16, 8, 24, 4, 12, 20, 28, 2, 6, 10, 32, 1, 3])
     tree.delete(20)
     assert 20 not in tree
     assert tree.root.value == 8

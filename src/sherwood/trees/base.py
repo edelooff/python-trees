@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Iterable, Optional
 
 if TYPE_CHECKING:
     from ..events import Bus, Event
@@ -31,14 +31,26 @@ class Tree(ABC):
     bus: Optional[Bus]
     root: Optional[Node]
 
-    def __init__(self, *initial_values: Any, event_bus: Optional[Bus] = None):
+    def __init__(
+        self,
+        initial_values: Optional[Iterable[Any]] = None,
+        /,
+        *,
+        event_bus: Optional[Bus] = None,
+    ):
         self.bus = event_bus
         self.root = None
-        self.bulk_insert(*initial_values)
+        if initial_values is not None:
+            for value in initial_values:
+                self.insert(value)
 
-    @abstractmethod
-    def bulk_insert(self, *values: Any) -> None:
-        ...
+    def __contains__(self, key: Any) -> bool:
+        node = self.root
+        while node is not None:
+            if key == node.value:
+                return True
+            node = node.right if key > node.value else node.left
+        return False
 
     def publish(self, name: str, event: Event) -> None:
         if self.bus is not None:

@@ -17,21 +17,6 @@ class AVLNode(Node):
 class AVLTree(Tree):
     root: Optional[AVLNode]
 
-    def __contains__(self, key: Any) -> bool:
-        node = self.root
-        while node is not None:
-            if key == node.value:
-                return True
-            node = node.right if key > node.value else node.left
-        return False
-
-    def bulk_insert(self, *values: Any) -> None:
-        """Inserts values from any iterable."""
-        if len(values) == 1:
-            values = values[0]
-        for value in values:
-            self.insert(value)
-
     def delete(self, key: Any) -> None:
         """Deletes a key from the AVL tree, or raises if it doesn't exist."""
         lineage = list(self._trace(key))

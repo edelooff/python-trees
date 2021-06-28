@@ -20,9 +20,9 @@ def test_empty_tree_traversal(traverser):
 @pytest.mark.parametrize(
     "tree, expected",
     [
-        (AVLTree(4, 2, 6, 1, 3, 5, 7), [1, 2, 3, 4, 5, 6, 7]),
-        (AVLTree(4, 2, 6, 1, 5, 7), [1, 2, 4, 5, 6, 7]),
-        (AVLTree(4, 2, 6, 3, 5, 7), [2, 3, 4, 5, 6, 7]),
+        (AVLTree([4, 2, 6, 1, 3, 5, 7]), [1, 2, 3, 4, 5, 6, 7]),
+        (AVLTree([4, 2, 6, 1, 5, 7]), [1, 2, 4, 5, 6, 7]),
+        (AVLTree([4, 2, 6, 3, 5, 7]), [2, 3, 4, 5, 6, 7]),
         (AVLTree(range(30, 100)), list(range(30, 100))),
     ],
 )
@@ -33,10 +33,10 @@ def test_ordered_traversal(in_order_traverser, tree, expected):
 @pytest.mark.parametrize(
     "tree, child, expected",
     [
-        (AVLTree(4, 2, 6, 1, 3), "left", [1, 2, 3]),
-        (AVLTree(4, 2, 6, 5, 7), "right", [5, 6, 7]),
-        (AVLTree(4, 2, 6, 1), "left", [1, 2]),
-        (AVLTree(4, 2, 6, 5), "right", [5, 6]),
+        (AVLTree([4, 2, 6, 1, 3]), "left", [1, 2, 3]),
+        (AVLTree([4, 2, 6, 5, 7]), "right", [5, 6, 7]),
+        (AVLTree([4, 2, 6, 1]), "left", [1, 2]),
+        (AVLTree([4, 2, 6, 5]), "right", [5, 6]),
     ],
 )
 def test_partial_ordered_traversal(in_order_traverser, tree, child, expected):
@@ -55,10 +55,10 @@ def test_rank_ordered_traversal(rank_order):
 @pytest.mark.parametrize(
     "tree, child, expected",
     [
-        (AVLTree(4, 2, 6, 1, 3), "left", [2, 1, 3]),
-        (AVLTree(4, 2, 6, 5, 7), "right", [6, 5, 7]),
-        (AVLTree(4, 2, 6, 1), "left", [2, 1]),
-        (AVLTree(4, 2, 6, 5), "right", [6, 5]),
+        (AVLTree([4, 2, 6, 1, 3]), "left", [2, 1, 3]),
+        (AVLTree([4, 2, 6, 5, 7]), "right", [6, 5, 7]),
+        (AVLTree([4, 2, 6, 1]), "left", [2, 1]),
+        (AVLTree([4, 2, 6, 5]), "right", [6, 5]),
     ],
 )
 def test_partial_rank_ordered_traversal(tree, child, expected):

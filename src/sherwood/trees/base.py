@@ -52,6 +52,14 @@ class Tree(ABC):
             node = node.right if key > node.value else node.left
         return False
 
+    @abstractmethod
+    def delete(self, key: Any) -> None:
+        ...
+
+    @abstractmethod
+    def insert(self, key: Any) -> Node:
+        ...
+
     def publish(self, name: str, event: Event) -> None:
         if self.bus is not None:
             self.bus.publish(name, event)

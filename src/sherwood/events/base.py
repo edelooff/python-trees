@@ -1,16 +1,19 @@
 from __future__ import annotations
 
-from typing import Callable, Dict, NamedTuple, Set
+from dataclasses import dataclass
+from typing import Callable, Dict, Set
 
 from ..trees.base import Node
 
 
-class Event(NamedTuple):
+@dataclass(frozen=True)
+class Event:
+    topic: str
     root: Node
     nodes: Set[Node]
 
 
-EventHandler = Callable[[str, Event], None]
+EventHandler = Callable[[Event], None]
 
 
 class Bus:
@@ -19,11 +22,11 @@ class Bus:
     def __init__(self) -> None:
         self.subscribers: Dict[str, Set[EventHandler]] = {}
 
-    def publish(self, topic: str, event: Event) -> None:
-        full_topic = topic
+    def publish(self, topic: str, root: Node, nodes: Set[Node]) -> None:
+        event = Event(topic=topic, root=root, nodes=nodes)
         while topic:
             for handler in self.subscribers.get(topic, ()):
-                handler(full_topic, event)
+                handler(event)
             topic, _, _ = topic.rpartition(".")
 
     def subscribe(self, topic: str, handler: EventHandler) -> None:

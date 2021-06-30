@@ -6,7 +6,7 @@ from multiprocessing import Pool
 from types import TracebackType
 from typing import Any, Iterator, List, NamedTuple, Optional, Set, Tuple, Type, Union
 
-from ..trees.base import Node, Tree
+from ..trees.base import BinaryNode, Node, Tree
 from ..utils.draw import MarkedNodes, tree_graph
 from .base import Bus, Event
 
@@ -17,16 +17,16 @@ class Animator:
         self.base_name = base_name
         self.workers = Pool()
 
-    def graph_delete(self, topic: str, event: Event) -> None:
+    def graph_delete(self, event: Event) -> None:
         self._render(AnimationFrame(event.root, event.nodes, highlight_hue=0.9))
 
-    def graph_insert(self, topic: str, event: Event) -> None:
+    def graph_insert(self, event: Event) -> None:
         self._render(AnimationFrame(event.root, event.nodes, highlight_hue=0.4))
 
-    def graph_rebalanced(self, topic: str, event: Event) -> None:
+    def graph_rebalanced(self, event: Event) -> None:
         self._render(AnimationFrame(event.root, event.nodes, highlight_hue=0.6))
 
-    def graph_rotation(self, topic: str, event: Event) -> None:
+    def graph_rotation(self, event: Event) -> None:
         self._render(AnimationFrame(event.root, event.nodes, highlight_hue=0.7))
 
     def _render(self, frame: AnimationFrame) -> None:
@@ -74,23 +74,24 @@ class AnimationFrame:
     @classmethod
     def from_serialized(cls, frame: SerialFrame) -> AnimationFrame:
         ivalues = iter(frame.serialization)
-        root = node = Node(next(ivalues))
-        marked_nodes = {root} if 0 in frame.node_indices else set()
+        root = node = BinaryNode(next(ivalues))
+        marked_nodes: Set[Node] = {root} if 0 in frame.node_indices else set()
         stack = []
         for idx, (branch_id, value) in enumerate(zip(ivalues, ivalues), 1):
             if branch_id == 0:
                 stack.append(node)
-                node.left = node = Node(value)
+                node.left = node = BinaryNode(value)
             else:
                 for _ in range(1, branch_id):
                     node = stack.pop()
-                node.right = node = Node(value)
+                node.right = node = BinaryNode(value)
             if idx in frame.node_indices:
                 marked_nodes.add(node)
         return cls(root, marked_nodes, frame.hue)
 
     def serialize(self) -> SerialFrame:
-        serialization, node_indices = [], []
+        serialization: List[Any] = []
+        node_indices: List[int] = []
         cur_branch = 0
         for node_index, (node, new_branch) in enumerate(dfs_branch_encoded(self.root)):
             if node in self.marked_nodes:

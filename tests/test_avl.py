@@ -1,5 +1,7 @@
 import pytest
 
+from sherwood.trees.avl import AVLTree
+
 
 def tree_height(node):
     if node is None:
@@ -48,49 +50,33 @@ def pre_order(tree):
     return list(_traversal(tree.root))
 
 
-@pytest.fixture
-def Tree():
-    from sherwood.trees.avl import AVLTree
-
-    return AVLTree
-
-
-@pytest.fixture
-def tree(Tree):
-    return Tree()
-
-
-def test_tree_insert(tree):
+def test_tree_insert():
+    tree = AVLTree()
     tree.insert(5)
     assert 5 in tree
 
 
-def test_tree_bulk_insert(tree):
-    tree.bulk_insert([1, 2])
+def test_instantiate_from_list():
+    tree = AVLTree([1, 2])
     assert 1 in tree
     assert 2 in tree
 
 
-def test_instantiate_from_list(Tree):
-    tree = Tree([1, 2])
+def test_instantiate_from_iter():
+    tree = AVLTree(range(1, 3))
     assert 1 in tree
     assert 2 in tree
 
 
-def test_instantiate_from_iter(Tree):
-    tree = Tree(range(1, 3))
-    assert 1 in tree
-    assert 2 in tree
+def test_instantiate_from_string():
+    tree = AVLTree("abc")
+    assert "a" in tree
+    assert "b" in tree
+    assert "c" in tree
 
 
-def test_instantiate_from_params(Tree):
-    tree = Tree(1, 2)
-    assert 1 in tree
-    assert 2 in tree
-
-
-def test_double_insert_exception(tree):
-    tree.insert(5)
+def test_double_insert_exception():
+    tree = AVLTree([5])
     with pytest.raises(ValueError):
         tree.insert(5)
 
@@ -104,29 +90,29 @@ def test_double_insert_exception(tree):
         pytest.param([3, 1, 2], [2, 1, 3], id="left-right rotation"),
     ],
 )
-def test_basic_rotations(Tree, insert, expected):
+def test_basic_rotations(insert, expected):
     """Tests basic tree rotations and resulting balance."""
-    tree = Tree(insert)
+    tree = AVLTree(insert)
     assert_avl_invariants(tree.root)
     assert pre_order(tree) == expected
 
 
-def test_double_rotation(Tree):
-    tree = Tree(5, 4, 3, 2, 1)
+def test_double_rotation():
+    tree = AVLTree([5, 4, 3, 2, 1])
     assert_avl_invariants(tree.root)
     assert pre_order(tree) == [4, 2, 1, 3, 5]
 
 
-def test_delete_nonexisting(tree):
+def test_delete_nonexisting():
     """Tests deletion of nonexisting key raises KeyError."""
-    tree.insert(1)
+    tree = AVLTree()
     with pytest.raises(KeyError):
         tree.delete(2)
 
 
-def test_delete_root(tree):
+def test_delete_root():
     """Tests deletion of singular root node."""
-    tree.insert(1)
+    tree = AVLTree([1])
     tree.delete(1)
     assert 1 not in tree
     assert tree.root is None
@@ -143,9 +129,9 @@ def test_delete_root(tree):
         pytest.param([4, 2, 6], 6, [4, 2], id="right leaf of V-tree"),
     ],
 )
-def test_delete_trivial(Tree, insert, delete, expected):
+def test_delete_trivial(insert, delete, expected):
     """Tests deletion of root/leaf nodes requiring no rotation."""
-    tree = Tree(insert)
+    tree = AVLTree(insert)
     tree.delete(delete)
     assert delete not in tree
     assert pre_order(tree) == expected
@@ -163,9 +149,9 @@ def test_delete_trivial(Tree, insert, delete, expected):
         pytest.param([4, 2, 6, 1, 5, 7], [4, 2, 6], [5, 1, 7], id="hoist right (b)"),
     ],
 )
-def test_delete_attach_without_rotation(Tree, insert, deletes, expected):
+def test_delete_attach_without_rotation(insert, deletes, expected):
     """Tests selective pruning of nodes and reattaching them to parents."""
-    tree = Tree(insert)
+    tree = AVLTree(insert)
     for key in deletes:
         tree.delete(key)
     assert key not in tree
@@ -173,9 +159,9 @@ def test_delete_attach_without_rotation(Tree, insert, deletes, expected):
     assert_avl_invariants(tree.root)
 
 
-def test_delete_reattach(Tree):
+def test_delete_reattach():
     """Removing the root from a 2-depth V should reattach nodes correctly."""
-    tree = Tree(3, 2, 4, 1, 5)
+    tree = AVLTree([3, 2, 4, 1, 5])
     tree.delete(3)
     assert 3 not in tree
     assert pre_order(tree) == [2, 1, 4, 5]
@@ -193,18 +179,18 @@ def test_delete_reattach(Tree):
         pytest.param([4, 2, 6, 3], 6, [3, 2, 4], id="left-right rotation"),
     ],
 )
-def test_delete_single_rotation(Tree, insert, delete, expected):
+def test_delete_single_rotation(insert, delete, expected):
     """Tests deletion resulting in a single rotation."""
-    tree = Tree(insert)
+    tree = AVLTree(insert)
     tree.delete(delete)
     assert delete not in tree
     assert pre_order(tree) == expected
     assert_avl_invariants(tree.root)
 
 
-def test_delete_double_rotation(Tree):
+def test_delete_double_rotation():
     """Tests deletion resulting in a double rotation."""
-    tree = Tree(16, 8, 24, 4, 12, 20, 28, 2, 6, 10, 32, 1, 3)
+    tree = AVLTree([16, 8, 24, 4, 12, 20, 28, 2, 6, 10, 32, 1, 3])
     tree.delete(20)
     assert 20 not in tree
     assert tree.root.value == 8
@@ -226,8 +212,8 @@ def test_delete_double_rotation(Tree):
         pytest.param([6, 4, 8, 2, 5, 7, 1, 3], 6, id="propagate balance right child"),
     ],
 )
-def test_delete_rotation_under_root(Tree, insert, delete):
-    tree = Tree(insert)
+def test_delete_rotation_under_root(insert, delete):
+    tree = AVLTree(insert)
     tree.delete(delete)
     assert delete not in tree
     expected = sorted(insert)
@@ -247,9 +233,9 @@ def test_delete_rotation_under_root(Tree, insert, delete):
         pytest.param([8, 4, 12, 2, 10, 14, 9, 11], 2, id="right-left: balanced"),
     ],
 )
-def test_two_way_rotations_with_subtree_at_pivot(Tree, insert, delete):
+def test_two_way_rotations_with_subtree_at_pivot(insert, delete):
     """Deletion causes a LR or RL rotation and the new subtree root has children."""
-    tree = Tree(insert)
+    tree = AVLTree(insert)
     tree.delete(delete)
     assert delete not in tree
     expected = sorted(insert)

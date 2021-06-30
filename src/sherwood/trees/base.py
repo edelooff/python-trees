@@ -3,10 +3,13 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Iterable, Optional, Protocol, TypeVar
 
 if TYPE_CHECKING:
-    from ..events import Bus, Event
+    from ..events import Bus
+
+
+CT = TypeVar("CT", bound="Comparable")
 
 
 class Branch(Enum):
@@ -14,11 +17,31 @@ class Branch(Enum):
     right = auto()
 
 
+class Comparable(Protocol):
+    def __lt__(self: CT, other: CT) -> bool:
+        ...
+
+
+class Node(Protocol):
+    value: Comparable
+
+    @property
+    def left(self) -> Optional[Node]:
+        ...
+
+    @property
+    def right(self) -> Optional[Node]:
+        ...
+
+
 @dataclass
-class Node:
-    value: Any
-    left: Optional[Node] = None
-    right: Optional[Node] = None
+class BinaryNode:
+    value: Comparable
+    left: Optional[BinaryNode] = None
+    right: Optional[BinaryNode] = None
+
+    def __eq__(self, other: Any) -> bool:
+        return self is other
 
     def __hash__(self) -> int:
         return id(self)
@@ -31,15 +54,37 @@ class Tree(ABC):
     bus: Optional[Bus]
     root: Optional[Node]
 
-    def __init__(self, *initial_values: Any, event_bus: Optional[Bus] = None):
+    def __init__(
+        self,
+        initial_values: Optional[Iterable[Any]] = None,
+        /,
+        *,
+        event_bus: Optional[Bus] = None,
+    ):
         self.bus = event_bus
         self.root = None
-        self.bulk_insert(*initial_values)
+        if initial_values is not None:
+            for value in initial_values:
+                self.insert(value)
+
+    def __contains__(self, key: Any) -> bool:
+        node = self.root
+        while node is not None:
+            if key == node.value:
+                return True
+            node = node.right if key > node.value else node.left
+        return False
 
     @abstractmethod
-    def bulk_insert(self, *values: Any) -> None:
+    def delete(self, key: Any) -> None:
         ...
 
-    def publish(self, name: str, event: Event) -> None:
+    @abstractmethod
+    def insert(self, key: Any) -> Node:
+        ...
+
+    def publish(self, topic: str, *nodes: Optional[Node]) -> None:
         if self.bus is not None:
-            self.bus.publish(name, event)
+            if self.root is None:
+                raise ValueError("Cannot publish events for empty tree.")
+            self.bus.publish(topic, self.root, set(filter(None, nodes)))

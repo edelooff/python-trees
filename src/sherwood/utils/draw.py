@@ -2,12 +2,16 @@ from __future__ import annotations
 
 from collections import deque
 from colorsys import hls_to_rgb
-from functools import lru_cache
-from typing import Any, Callable, Dict, Optional, Set, Union
+from dataclasses import dataclass
+from functools import cached_property, lru_cache
+from typing import Any, Callable, Iterator, Optional, Sequence, Set, Tuple, Union
 
-from pydot import Dot, Edge, Node
+from pydot import Dot, Edge, Node as DotNode
 
-from ..trees.base import Node as BinaryNode
+from ..events.base import AnimationNode
+from ..trees.base import Node
+from ..trees.redblack import RBNode
+
 
 GRAPH_STYLE = {
     "bgcolor": "#ffffff00",
@@ -15,145 +19,181 @@ GRAPH_STYLE = {
     "ranksep": 0.2,
 }
 NODE_STYLE = {
-    "fillcolor": "lightyellow",
+    "color": "#222222",
+    "fillcolor": "#596e80",
+    "fontcolor": "#ffffff",
     "fontname": "ubuntu mono bold",
-    "fontsize": 18,
+    "fontsize": 16,
     "penwidth": 2,
     "shape": "circle",
     "style": "filled",
 }
 
 
+@dataclass
+class DrawContext:
+    graph: Dot
+    marked_nodes: Set[Node]
+    marked_hue: float
+
+    @property
+    def edge_color(self) -> str:
+        return hls_to_html(self.marked_hue, 0.35, 0.75)
+
+    @property
+    def fill_color(self) -> str:
+        return hls_to_html(self.marked_hue, 0.92, 0.75)
+
+    @cached_property
+    def height(self) -> Callable[[Optional[Node]], int]:
+        """Provides a node-height function to return the height of its subtree.
+
+        The height is determined recursively by going down the entire subtree.
+        This avoids suboptimal results in trees where balance factors have not
+        been updated yet. A cache ensures that determining the height of all
+        subtrees in the tree only takes time on the order of the node count.
+        """
+
+        @lru_cache(maxsize=1024)
+        def height(node: Optional[Node]) -> int:
+            if node is None:
+                return -1
+            return 1 + max(height(node.left), height(node.right))
+
+        return height
+
+
 # Type helpers
-DotStyle = Dict[str, Union[int, str]]
-NodeDividerDrawer = Callable[[BinaryNode], None]
-NodeDrawer = Callable[[BinaryNode, Optional[BinaryNode]], None]
-NodeHeight = Callable[[Optional[BinaryNode]], int]
+DotAttrs = Iterator[Tuple[str, Union[int, str]]]
+EdgeAttributeGenerator = Callable[[DrawContext, Node, Node], DotAttrs]
+NodeAttributeGenerator = Callable[[DrawContext, Node], DotAttrs]
+Renderer = Callable[[Node, Optional[Set[Node]], float], Dot]
 
 
-class MarkedNodes:
-    def __init__(self, nodes: Set[BinaryNode], hue: float = 0):
-        self.nodes = nodes
-        self.edge_color = self._create_color(hue, 0.2)
-        self.fill_color = self._create_color(hue, 0.92)
+@dataclass
+class TreeRenderer:
+    edge_attr_funcs: Sequence[EdgeAttributeGenerator] = ()
+    node_attr_funcs: Sequence[NodeAttributeGenerator] = ()
 
-    def __contains__(self, other: Any) -> bool:
-        return other in self.nodes
+    def __call__(
+        self,
+        root: Node,
+        marked_nodes: Optional[Set[Node]] = None,
+        marked_hue: float = 0,
+    ) -> Dot:
+        """Returns a Dot graph for the tree starting at the given node.
 
-    def __ge__(self, other: Any) -> bool:
-        if isinstance(other, type(self)):
-            return other.nodes <= self.nodes
-        elif isinstance(other, set):
-            return other <= self.nodes
-        return NotImplemented
+        An optional selection of marked nodes may be provided. The rendering
+        of these marked nodes is controlled entirely by the node/edge_attr_funcs.
+        """
+        graph = Dot(**GRAPH_STYLE)
+        graph.set_edge_defaults(color="#222222", dir="none", penwidth=2)
+        graph.set_node_defaults(**NODE_STYLE)
+        if marked_nodes is None:
+            marked_nodes = set()
+        context = DrawContext(graph, marked_nodes, marked_hue)
+        self.draw_node(context, root, None)
+        nodes = deque([root])
+        while nodes:
+            node = nodes.popleft()
+            if node.left:
+                self.draw_node(context, node.left, node)
+                nodes.append(node.left)
+            self.draw_divider(context, node)
+            if node.right:
+                self.draw_node(context, node.right, node)
+                nodes.append(node.right)
+        return graph
 
-    @staticmethod
-    def _create_color(hue: float, lightness: float) -> str:
-        rgb_color = (round(val * 255) for val in hls_to_rgb(hue, lightness, 1))
-        return "#{:02x}{:02x}{:02x}".format(*rgb_color)
+    def draw_divider(self, context: DrawContext, node: Node) -> None:
+        """Adds an invisible vertical divider to the graph in the DrawContext.
 
-
-def cached_node_height(cache_size: int) -> NodeHeight:
-    """Provides a node-height function to return the height of its subtree.
-
-    The height is determined recursively by going down the entire subtree.
-    This avoids suboptimal results in trees where balance factors have not
-    been updated yet. A cache ensures that determining the height of all
-    subtrees in the tree only takes time on the order of the node count.
-    """
-
-    @lru_cache(maxsize=cache_size)
-    def height(node: Optional[BinaryNode]) -> int:
-        if node is None:
-            return -1
-        return 1 + max(height(node.left), height(node.right))
-
-    return height
-
-
-def tree_graph(
-    root: BinaryNode,
-    *,
-    marked_nodes: Optional[MarkedNodes] = None,
-    draw_height_imbalance: bool = True,
-) -> Dot:
-    """Returns a Dot graph for the tree starting at the given node.
-
-    An optional selection of marked nodes will be graphed in a different fill
-    color, as defined by the MarkedNodes instance. The `draw_height_imbalance`
-    parameter controls whether children that start a taller subtree should be
-    drawn with an emphasized edge.
-    """
-    graph = Dot(**GRAPH_STYLE)
-    graph.set_edge_defaults(color="navy", dir="none", penwidth=2)
-    graph.set_node_defaults(**NODE_STYLE)
-    if marked_nodes is None:
-        marked_nodes = MarkedNodes(set())
-    node_height = cached_node_height(1024)
-    draw_divider = _divider_drawer(graph, node_height)
-    draw_node = _node_drawer(
-        graph,
-        marked_nodes=marked_nodes,
-        height=node_height if draw_height_imbalance else None,
-    )
-    draw_node(root, None)
-    nodes = deque([root])
-    while nodes:
-        node = nodes.popleft()
-        if node.left:
-            draw_node(node.left, node)
-            nodes.append(node.left)
-        draw_divider(node)
-        if node.right:
-            draw_node(node.right, node)
-            nodes.append(node.right)
-    return graph
-
-
-def _divider_drawer(graph: Dot, height: NodeHeight) -> NodeDividerDrawer:
-    """Draws a vertical divider to distinguish left/right child nodes."""
-    marker_style = {"label": "", "width": 0, "height": 0, "style": "invis"}
-
-    def _divider(node: BinaryNode) -> None:
+        This provides horizontal separation between left and right child nodes.
+        This divider consists of a number of nodes equal to the 'height' of the
+        given node and the nodes and edges to them are drawn invisibly.
+        """
+        marker_style = {"label": "", "width": 0, "height": 0, "style": "invis"}
         target = str(id(node))
-        for _ in range(height(node)):
+        for _ in range(context.height(node)):
             parent, target = target, f":{target}"
-            graph.add_node(Node(target, **marker_style))
-            graph.add_edge(Edge(parent, target, style="invis", weight=5))
+            context.graph.add_node(DotNode(target, **marker_style))
+            context.graph.add_edge(Edge(parent, target, style="invis", weight=5))
 
-    return _divider
+    def draw_node(
+        self, context: DrawContext, node: Node, parent: Optional[Node]
+    ) -> None:
+        """Adds the given node to the graph in the DrawContext.
 
-
-def _node_drawer(
-    graph: Dot, *, marked_nodes: MarkedNodes, height: Optional[NodeHeight] = None
-) -> NodeDrawer:
-    """Returns a node drawing function, for the given graph and marked nodes.
-
-    The returned function will draw the actual Dot node, and when given
-    a parent node, an edge from the parent down to the target node.
-
-    Alternate colors for marked nodes are determined based on the fill or
-    edge color specified by the `marked_nodes` object.
-    """
-
-    def _tallest_child(node: BinaryNode, parent: BinaryNode) -> bool:
-        """Returns whether the node is the tallest child of its parent."""
-        if height is None:
-            return True
-        elif node is parent.left:
-            return height(node) > height(parent.right)
-        else:
-            return height(node) > height(parent.left)
-
-    def _draw(node: BinaryNode, parent: Optional[BinaryNode]) -> None:
-        node_options = {"label": str(node.value)}
-        if node in marked_nodes:
-            node_options["fillcolor"] = marked_nodes.fill_color
-        graph.add_node(Node(str(id(node)), **node_options))
+        When the parent argument is given and non-None, an edge is drawn from
+        parent down to the given node. The node is labeled with the string
+        representation of its value. Additional graphviz attributes for both
+        the Node and Edge are derived from `node_attrs` and `edge_attrs` resp.
+        """
+        node_attrs = dict(self.node_attrs(context, node))
+        node_attrs.setdefault("label", str(node.value))
+        context.graph.add_node(DotNode(str(id(node)), **node_attrs))
         if parent is not None:
-            style: DotStyle = {"penwidth": 4 if _tallest_child(node, parent) else 2}
-            if {node, parent} <= marked_nodes:
-                style["color"] = marked_nodes.edge_color
-            graph.add_edge(Edge(str(id(parent)), str(id(node)), **style))
+            edge_attrs = dict(self.edge_attrs(context, node, parent))
+            context.graph.add_edge(Edge(str(id(parent)), str(id(node)), **edge_attrs))
 
-    return _draw
+    def edge_attrs(self, context: DrawContext, node: Node, parent: Node) -> DotAttrs:
+        """Iterator of Dot attributes over all provided edge attribute functions."""
+        for func in self.edge_attr_funcs:
+            yield from func(context, node, parent)
+
+    def node_attrs(self, context: DrawContext, node: Node) -> DotAttrs:
+        """Iterator of Dot attributes over all provided node attribute functions."""
+        for func in self.node_attr_funcs:
+            yield from func(context, node)
+
+
+def hls_to_html(hue: float, lightness: float, saturation: float) -> str:
+    rgb_color = hls_to_rgb(hue, lightness, saturation)
+    return "#{:02x}{:02x}{:02x}".format(*(round(val * 255) for val in rgb_color))
+
+
+def color_marked_node_edge(context: DrawContext, node: Node, parent: Node) -> DotAttrs:
+    if {node, parent} <= context.marked_nodes:
+        yield "color", context.edge_color
+
+
+def imbalanced_edge_weight(context: DrawContext, node: Node, parent: Node) -> DotAttrs:
+    """Increases the edge's pen width if the current node is the parent's tallest."""
+    if node is parent.left and context.height(node) > context.height(parent.right):
+        yield "penwidth", 3
+    elif node is parent.right and context.height(node) > context.height(parent.left):
+        yield "penwidth", 3
+
+
+def outline_marked_node(context: DrawContext, node: Node) -> DotAttrs:
+    if node in context.marked_nodes:
+        yield "color", context.edge_color
+        yield "peripheries", 2
+
+
+def red_black_node_color(context: DrawContext, node: Node) -> DotAttrs:
+    color: Any
+    if isinstance(node, RBNode):
+        color = node.color.name
+    elif isinstance(node, AnimationNode):
+        color = node.options.get("color")
+    if color == "black":
+        yield "fillcolor", "#555555"
+    elif color == "red":
+        yield "fillcolor", "#dd1133"
+
+
+draw_tree: Renderer = TreeRenderer(
+    edge_attr_funcs=[color_marked_node_edge],
+    node_attr_funcs=[outline_marked_node],
+)
+
+draw_avl_tree: Renderer = TreeRenderer(
+    edge_attr_funcs=[color_marked_node_edge, imbalanced_edge_weight],
+    node_attr_funcs=[outline_marked_node],
+)
+
+draw_redblack_tree: Renderer = TreeRenderer(
+    edge_attr_funcs=[color_marked_node_edge],
+    node_attr_funcs=[outline_marked_node, red_black_node_color],
+)

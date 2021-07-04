@@ -4,7 +4,7 @@ from typing import Callable, Iterator, Optional, Sequence, Set, Tuple, Union
 
 from pydot import Dot, Edge, Node as DotNode
 
-from ..trees.base import Node
+from ..typing import Node
 from .context import DrawContext
 
 GRAPH_STYLE = {

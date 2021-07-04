@@ -5,7 +5,7 @@ from typing import Callable, Optional, Set
 
 from pydot import Dot
 
-from ..trees.base import Node
+from ..typing import Node
 
 
 @dataclass

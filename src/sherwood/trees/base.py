@@ -3,35 +3,17 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import TYPE_CHECKING, Any, Iterable, Optional, Protocol, TypeVar
+from typing import TYPE_CHECKING, Any, Iterable, Optional
+
+from ..typing import Comparable, Node
 
 if TYPE_CHECKING:
     from ..events import Bus
 
 
-CT = TypeVar("CT", bound="Comparable")
-
-
 class Branch(Enum):
     left = auto()
     right = auto()
-
-
-class Comparable(Protocol):
-    def __lt__(self: CT, other: CT) -> bool:
-        ...
-
-
-class Node(Protocol):
-    value: Comparable
-
-    @property
-    def left(self) -> Optional[Node]:
-        ...
-
-    @property
-    def right(self) -> Optional[Node]:
-        ...
 
 
 @dataclass

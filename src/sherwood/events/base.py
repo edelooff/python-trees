@@ -3,13 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Optional, Set, final
 
-from ..trees.base import BinaryNode, Comparable, Node
+from ..trees.base import BinaryNode
+from ..typing import Node
 
 
 @final
 @dataclass(eq=False)
 class AnimationNode(BinaryNode):
-    value: Comparable
     left: Optional[AnimationNode] = None
     right: Optional[AnimationNode] = None
     options: Dict[str, Any] = field(default_factory=dict)

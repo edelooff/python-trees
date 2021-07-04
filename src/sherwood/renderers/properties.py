@@ -1,9 +1,10 @@
 from typing import Any
 
 from ..events.base import AnimationNode
-from ..trees.base import Node
 from ..trees.redblack import RBNode
-from .base import DotAttrs, DrawContext
+from ..typing import Node
+from .base import DotAttrs
+from .context import DrawContext
 
 
 def color_marked_node_edge(context: DrawContext, node: Node, parent: Node) -> DotAttrs:

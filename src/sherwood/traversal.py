@@ -3,7 +3,8 @@
 from collections import deque
 from typing import Any, Callable, Deque, Iterator, Optional, Union, cast
 
-from .trees.base import Node, Tree
+from .trees.base import Tree
+from .typing import Node
 
 Treelike = Union[Node, Tree]
 

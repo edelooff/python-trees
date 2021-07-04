@@ -7,8 +7,9 @@ from multiprocessing import Pool
 from types import TracebackType
 from typing import Any, Dict, Iterator, List, NamedTuple, Optional, Set, Tuple, Type
 
-from ..trees.base import Node, Tree
 from ..renderers import Renderer, draw_tree
+from ..trees.base import Tree
+from ..typing import Node
 from .base import AnimationNode, Bus, Event
 
 

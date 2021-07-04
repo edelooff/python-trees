@@ -1,9 +1,9 @@
 import random
 
 from sherwood.events.animator import tree_renderer
+from sherwood.renderers import draw_avl_tree, draw_redblack_tree
 from sherwood.trees.avl import AVLTree
 from sherwood.trees.redblack import RedBlackTree
-from sherwood.utils.draw import draw_avl_tree, draw_redblack_tree
 
 
 def main():

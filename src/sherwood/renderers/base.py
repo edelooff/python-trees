@@ -1,17 +1,11 @@
-from __future__ import annotations
-
 from collections import deque
-from colorsys import hls_to_rgb
 from dataclasses import dataclass
-from functools import cached_property, lru_cache
-from typing import Any, Callable, Iterator, Optional, Sequence, Set, Tuple, Union
+from typing import Callable, Iterator, Optional, Sequence, Set, Tuple, Union
 
 from pydot import Dot, Edge, Node as DotNode
 
-from ..events.base import AnimationNode
 from ..trees.base import Node
-from ..trees.redblack import RBNode
-
+from .context import DrawContext
 
 GRAPH_STYLE = {
     "bgcolor": "#ffffff00",
@@ -29,41 +23,7 @@ NODE_STYLE = {
     "style": "filled",
 }
 
-
-@dataclass
-class DrawContext:
-    graph: Dot
-    marked_nodes: Set[Node]
-    marked_hue: float
-
-    @property
-    def edge_color(self) -> str:
-        return hls_to_html(self.marked_hue, 0.35, 0.75)
-
-    @property
-    def fill_color(self) -> str:
-        return hls_to_html(self.marked_hue, 0.92, 0.75)
-
-    @cached_property
-    def height(self) -> Callable[[Optional[Node]], int]:
-        """Provides a node-height function to return the height of its subtree.
-
-        The height is determined recursively by going down the entire subtree.
-        This avoids suboptimal results in trees where balance factors have not
-        been updated yet. A cache ensures that determining the height of all
-        subtrees in the tree only takes time on the order of the node count.
-        """
-
-        @lru_cache(maxsize=1024)
-        def height(node: Optional[Node]) -> int:
-            if node is None:
-                return -1
-            return 1 + max(height(node.left), height(node.right))
-
-        return height
-
-
-# Type helpers
+# Type aliases
 DotAttrs = Iterator[Tuple[str, Union[int, str]]]
 EdgeAttributeGenerator = Callable[[DrawContext, Node, Node], DotAttrs]
 NodeAttributeGenerator = Callable[[DrawContext, Node], DotAttrs]
@@ -145,55 +105,3 @@ class TreeRenderer:
         """Iterator of Dot attributes over all provided node attribute functions."""
         for func in self.node_attr_funcs:
             yield from func(context, node)
-
-
-def hls_to_html(hue: float, lightness: float, saturation: float) -> str:
-    rgb_color = hls_to_rgb(hue, lightness, saturation)
-    return "#{:02x}{:02x}{:02x}".format(*(round(val * 255) for val in rgb_color))
-
-
-def color_marked_node_edge(context: DrawContext, node: Node, parent: Node) -> DotAttrs:
-    if {node, parent} <= context.marked_nodes:
-        yield "color", context.edge_color
-
-
-def imbalanced_edge_weight(context: DrawContext, node: Node, parent: Node) -> DotAttrs:
-    """Increases the edge's pen width if the current node is the parent's tallest."""
-    if node is parent.left and context.height(node) > context.height(parent.right):
-        yield "penwidth", 3
-    elif node is parent.right and context.height(node) > context.height(parent.left):
-        yield "penwidth", 3
-
-
-def outline_marked_node(context: DrawContext, node: Node) -> DotAttrs:
-    if node in context.marked_nodes:
-        yield "color", context.edge_color
-        yield "peripheries", 2
-
-
-def red_black_node_color(context: DrawContext, node: Node) -> DotAttrs:
-    color: Any
-    if isinstance(node, RBNode):
-        color = node.color.name
-    elif isinstance(node, AnimationNode):
-        color = node.options.get("color")
-    if color == "black":
-        yield "fillcolor", "#555555"
-    elif color == "red":
-        yield "fillcolor", "#dd1133"
-
-
-draw_tree: Renderer = TreeRenderer(
-    edge_attr_funcs=[color_marked_node_edge],
-    node_attr_funcs=[outline_marked_node],
-)
-
-draw_avl_tree: Renderer = TreeRenderer(
-    edge_attr_funcs=[color_marked_node_edge, imbalanced_edge_weight],
-    node_attr_funcs=[outline_marked_node],
-)
-
-draw_redblack_tree: Renderer = TreeRenderer(
-    edge_attr_funcs=[color_marked_node_edge],
-    node_attr_funcs=[outline_marked_node, red_black_node_color],
-)

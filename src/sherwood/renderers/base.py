@@ -1,30 +1,27 @@
 from collections import deque
 from dataclasses import dataclass
-from typing import Callable, Iterator, Optional, Sequence, Set, Tuple, Union
+from typing import (
+    Callable,
+    ClassVar,
+    Dict,
+    Iterator,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Union,
+)
 
-from pydot import Dot, Edge, Node as DotNode
+from pydot import Dot, Edge
+from pydot import Node as DotNode
 
 from ..typing import Node
 from .context import DrawContext
 
-GRAPH_STYLE = {
-    "bgcolor": "#ffffff00",
-    "nodesep": 0.3,
-    "ranksep": 0.2,
-}
-NODE_STYLE = {
-    "color": "#222222",
-    "fillcolor": "#596e80",
-    "fontcolor": "#ffffff",
-    "fontname": "ubuntu mono bold",
-    "fontsize": 16,
-    "penwidth": 2,
-    "shape": "circle",
-    "style": "filled",
-}
-
 # Type aliases
-DotAttrs = Iterator[Tuple[str, Union[int, str]]]
+DotValue = Union[float, int, str]
+DotAttrDict = Dict[str, DotValue]
+DotAttrs = Iterator[Tuple[str, DotValue]]
 EdgeAttributeGenerator = Callable[[DrawContext, Node, Node], DotAttrs]
 NodeAttributeGenerator = Callable[[DrawContext, Node], DotAttrs]
 Renderer = Callable[[Node, Optional[Set[Node]], float], Dot]
@@ -34,6 +31,27 @@ Renderer = Callable[[Node, Optional[Set[Node]], float], Dot]
 class TreeRenderer:
     edge_attr_funcs: Sequence[EdgeAttributeGenerator] = ()
     node_attr_funcs: Sequence[NodeAttributeGenerator] = ()
+
+    edge_defaults: ClassVar[DotAttrDict] = {
+        "color": "#222222",
+        "dir": "none",
+        "penwidth": 2,
+    }
+    graph_defaults: ClassVar[DotAttrDict] = {
+        "bgcolor": "#ffffff00",
+        "nodesep": 0.3,
+        "ranksep": 0.2,
+    }
+    node_defaults: ClassVar[DotAttrDict] = {
+        "color": "#222222",
+        "fillcolor": "#667788",
+        "fontcolor": "#ffffff",
+        "fontname": "ubuntu mono bold",
+        "fontsize": 16,
+        "penwidth": 2,
+        "shape": "circle",
+        "style": "filled",
+    }
 
     def __call__(
         self,
@@ -46,12 +64,7 @@ class TreeRenderer:
         An optional selection of marked nodes may be provided. The rendering
         of these marked nodes is controlled entirely by the node/edge_attr_funcs.
         """
-        graph = Dot(**GRAPH_STYLE)
-        graph.set_edge_defaults(color="#222222", dir="none", penwidth=2)
-        graph.set_node_defaults(**NODE_STYLE)
-        if marked_nodes is None:
-            marked_nodes = set()
-        context = DrawContext(graph, marked_nodes, marked_hue)
+        context = self.new_context(marked_nodes or set(), marked_hue)
         self.draw_node(context, root, None)
         nodes = deque([root])
         while nodes:
@@ -63,7 +76,7 @@ class TreeRenderer:
             if node.right:
                 self.draw_node(context, node.right, node)
                 nodes.append(node.right)
-        return graph
+        return context.graph
 
     def draw_divider(self, context: DrawContext, node: Node) -> None:
         """Adds an invisible vertical divider to the graph in the DrawContext.
@@ -105,3 +118,9 @@ class TreeRenderer:
         """Iterator of Dot attributes over all provided node attribute functions."""
         for func in self.node_attr_funcs:
             yield from func(context, node)
+
+    def new_context(self, marked_nodes: Set[Node], marked_hue: float) -> DrawContext:
+        graph = Dot(**self.graph_defaults)
+        graph.set_edge_defaults(**self.edge_defaults)
+        graph.set_node_defaults(**self.node_defaults)
+        return DrawContext(graph, marked_nodes, marked_hue)

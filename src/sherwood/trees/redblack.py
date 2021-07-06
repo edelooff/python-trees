@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum, auto
 from itertools import takewhile
-from typing import Any, Iterator, Optional, cast, final
+from typing import Any, Iterator, Optional, final
 
 from .base import BinaryNode, Tree
 
@@ -64,9 +64,9 @@ class RedBlackTree(Tree):
                 parent.color = Color.black
                 break
             grandparent = next(lineage)
-            if has_all_red_children(grandparent):
+            if has_same_colored_children(grandparent):
+                invert_color(grandparent, grandparent.left, grandparent.right)
                 node = grandparent
-                invert_color(node, cast(RBNode, node.left), cast(RBNode, node.right))
                 continue
             # Determine rotation necessary to rebalance tree
             if node is parent.left:
@@ -119,14 +119,14 @@ class RedBlackTree(Tree):
         return pivot
 
 
-def has_all_red_children(node: RBNode) -> bool:
+def has_same_colored_children(node: RBNode) -> bool:
     return (
         node.left is not None
         and node.right is not None
-        and node.left.color is node.right.color is Color.red
+        and node.left.color is node.right.color
     )
 
 
-def invert_color(*nodes: RBNode) -> None:
-    for node in nodes:
+def invert_color(*nodes: Optional[RBNode]) -> None:
+    for node in filter(None, nodes):
         node.color = node.color.inverse

@@ -62,11 +62,13 @@ class RedBlackTree(Tree):
         for parent in takewhile(lambda node: node.color is not Color.black, lineage):
             if parent is self.root:
                 parent.color = Color.black
+                self.publish("recolor", parent)
                 break
             grandparent = next(lineage)
             if has_same_colored_children(grandparent):
                 invert_color(grandparent, grandparent.left, grandparent.right)
                 node = grandparent
+                self.publish("recolor", node, node.left, node.right)
                 continue
             # Determine rotation necessary to rebalance tree
             if node is parent.left:

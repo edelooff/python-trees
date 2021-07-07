@@ -28,6 +28,9 @@ class Animator:
     def graph_rebalanced(self, event: Event) -> None:
         self._render(AnimationFrame(event.root, event.nodes, marked_hue=0.62))
 
+    def graph_recolored(self, event: Event) -> None:
+        self._render(AnimationFrame(event.root, event.nodes, marked_hue=0.15))
+
     def graph_rotation(self, event: Event) -> None:
         self._render(AnimationFrame(event.root, event.nodes, marked_hue=0.83))
 
@@ -45,6 +48,7 @@ class Animator:
         bus = Bus()
         bus.subscribe("delete", self.graph_delete)
         bus.subscribe("insert", self.graph_insert)
+        bus.subscribe("recolor", self.graph_recolored)
         bus.subscribe("rotate", self.graph_rotation)
         bus.subscribe("balanced", self.graph_rebalanced)
         return bus

@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import Enum
 from multiprocessing import Pool
-from types import TracebackType
+from multiprocessing.pool import Pool as PoolType
 from typing import Any, Dict, Iterator, List, NamedTuple, Optional, Set, Tuple, Type
 
 from ..renderers import Renderer, draw_tree
@@ -18,7 +18,6 @@ class Animator:
         self._frame_count = 0
         self.base_name = base_name
         self.renderer = renderer
-        self.workers = Pool()
 
     def graph_delete(self, event: Event) -> None:
         self._render(AnimationFrame(event.root, event.nodes, marked_hue=0.95))
@@ -33,26 +32,16 @@ class Animator:
         self._render(AnimationFrame(event.root, event.nodes, marked_hue=0.83))
 
     def _render(self, frame: AnimationFrame) -> None:
-        draw_args = frame.serialize(), self.frame_name, self.renderer
-        self.workers.apply_async(self.draw_graph, draw_args)
+        frame.render(self.frame_name, self.renderer)
 
     @property
     def frame_name(self) -> str:
         self._frame_count += 1
         return f"{self.base_name}_{self._frame_count}.png"
 
-    def finish(self) -> None:
-        """Closes the worker pool for additional jobs and waits for them to finish."""
-        self.workers.close()
-        self.workers.join()
-
-    @staticmethod
-    def draw_graph(serialized: SerialFrame, name: str, renderer: Renderer) -> None:
-        """Multiprocess worker function to do the actual work of image rendering."""
-        frame = AnimationFrame.from_serialized(serialized)
-        frame.render(name, renderer)
-
-    def __enter__(self) -> Bus:
+    @property
+    def bus(self) -> Bus:
+        """Returns a new Bus, subscribed to all supported animation events."""
         bus = Bus()
         bus.subscribe("delete", self.graph_delete)
         bus.subscribe("insert", self.graph_insert)
@@ -60,13 +49,21 @@ class Animator:
         bus.subscribe("balanced", self.graph_rebalanced)
         return bus
 
-    def __exit__(
-        self,
-        exc_type: Optional[Type[Exception]],
-        exc_value: Optional[Exception],
-        traceback: Optional[TracebackType],
-    ) -> None:
-        self.finish()
+
+class AsyncPoolAnimator(Animator):
+    def __init__(self, renderer: Renderer, base_name: str, pool: PoolType):
+        super().__init__(renderer, base_name)
+        self.pool = pool
+
+    def _render(self, frame: AnimationFrame) -> None:
+        draw_args = frame.serialize(), self.frame_name, self.renderer
+        self.pool.apply_async(self.draw_graph, draw_args)
+
+    @staticmethod
+    def draw_graph(serialized: SerialFrame, name: str, renderer: Renderer) -> None:
+        """Multiprocess worker function to do the actual work of image rendering."""
+        frame = AnimationFrame.from_serialized(serialized)
+        frame.render(name, renderer)
 
 
 @dataclass
@@ -141,6 +138,9 @@ def node_extra_values(node: Node) -> Dict[str, Any]:
 def tree_renderer(
     tree_type: Type[Tree], base_name: str, renderer: Renderer = draw_tree
 ) -> Iterator[Tree]:
-    animator = Animator(renderer, base_name)
-    with animator as bus:
-        yield tree_type(event_bus=bus)
+    """Context manager to create multiprocess animator, connected bus and tree."""
+    with Pool() as pool:
+        animator = AsyncPoolAnimator(renderer, base_name, pool)
+        yield tree_type(event_bus=animator.bus)
+        pool.close()
+        pool.join()

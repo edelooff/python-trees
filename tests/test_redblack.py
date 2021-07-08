@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import random
+from itertools import cycle
 
 import pytest
 
@@ -135,3 +135,40 @@ def test_basic_rotations(insert, expected):
     tree = RedBlackTree(insert)
     assert_invariants(tree.root)
     assert pre_order(tree) == expected
+
+
+@pytest.mark.parametrize(
+    "initial, root_color, additional, new_root_color",
+    [
+        pytest.param([5, 6, 3, 4, 2], Color.red, 1, Color.black, id="left side"),
+        pytest.param([2, 1, 4, 3, 5], Color.red, 6, Color.black, id="right side"),
+    ],
+)
+def test_double_recolor(initial, root_color, additional, new_root_color):
+    tree = RedBlackTree(initial)
+    assert tree.root.color is root_color
+    tree.insert(additional)
+    assert tree.root.color is new_root_color
+
+
+def test_triple_recolor():
+    """Recoloring continues towards the root or until rotations are required."""
+
+    def left_edge(node):
+        yield node.value, node.color
+        if node.left is not None:
+            yield from left_edge(node.left)
+
+    tree = RedBlackTree([13, 16, 8, 17, 15, 11, 5, 14, 12, 10, 6, 3, 9, 4, 2])
+    red_root_values = zip([13, 8, 5, 3, 2], cycle([Color.red, Color.black]))
+    assert list(left_edge(tree.root)) == list(red_root_values)
+    tree.insert(1)
+    black_root_values = zip([13, 8, 5, 3, 2, 1], cycle([Color.black, Color.red]))
+    assert list(left_edge(tree.root)) == list(black_root_values)
+
+
+def test_example():
+    tree = RedBlackTree()
+    for value in [43, 81, 95, 16, 28, 23, 63, 57]:
+        tree.insert(value)
+        assert_invariants(tree.root)

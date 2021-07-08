@@ -86,9 +86,7 @@ class RedBlackTree(Tree):
             else:
                 anchor.right = subtree
             self.publish("balanced", subtree, subtree.left, subtree.right)
-            if anchor is None or anchor.color is Color.black:
-                break
-            node = anchor
+            break
 
     def rotate_left(self, root: RBNode, pivot: RBNode, tail: RBNode) -> RBNode:
         """Hoists the pivot up to to be the new root of the given triple."""

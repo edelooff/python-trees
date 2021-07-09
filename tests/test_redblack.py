@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from itertools import cycle
+from operator import itemgetter
 
 import pytest
 
 from sherwood.trees.redblack import Color, RedBlackTree
+
+B, R = Color.black, Color.red
 
 
 def assert_invariants(node):
@@ -69,6 +72,21 @@ def pre_order(tree):
             yield from _traversal(node.right)
 
     return list(_traversal(tree.root))
+
+
+def tree_from_values_and_colors(colored_nodes):
+    def _traverser(node):
+        if node is not None:
+            yield node
+            yield from _traverser(node.left)
+            yield from _traverser(node.right)
+
+    tree = RedBlackTree(map(itemgetter(0), colored_nodes))
+    node_colors = dict(colored_nodes)
+    for node in _traverser(tree.root):
+        node.color = node_colors[node.value]
+    assert_invariants(tree.root)
+    return tree
 
 
 def test_tree_insert():
@@ -172,3 +190,67 @@ def test_example():
     for value in [43, 81, 95, 16, 28, 23, 63, 57]:
         tree.insert(value)
         assert_invariants(tree.root)
+
+
+def test_delete_nonexisting():
+    """Tests deletion of nonexisting key raises KeyError."""
+    tree = RedBlackTree()
+    with pytest.raises(KeyError):
+        tree.delete(2)
+
+
+def test_delete_root():
+    """Tests deletion of singular root node."""
+    tree = RedBlackTree([1])
+    tree.delete(1)
+    assert 1 not in tree
+    assert tree.root is None
+
+
+@pytest.mark.parametrize(
+    "insert, delete, expected",
+    [
+        pytest.param([4, 6], 4, [6], id="root of right-leaning line"),
+        pytest.param([4, 6], 6, [4], id="leaf of right-leaning line"),
+        pytest.param([4, 2], 4, [2], id="root of left-leaning line"),
+        pytest.param([4, 2], 2, [4], id="leaf of left-leaning line"),
+        pytest.param([4, 2, 6], 2, [4, 6], id="left leaf of V-tree"),
+        pytest.param([4, 2, 6], 6, [4, 2], id="right leaf of V-tree"),
+    ],
+)
+def test_delete_trivial(insert, delete, expected):
+    """Tests deletion of root/leaf nodes requiring no rotation."""
+    tree = RedBlackTree(insert)
+    tree.delete(delete)
+    assert_invariants(tree.root)
+    assert pre_order(tree) == expected
+
+
+@pytest.mark.parametrize(
+    "nodes, delete",
+    [
+        pytest.param([(2, B), (1, B), (3, B)], 1),
+        pytest.param([(2, B), (1, B), (3, B)], 3),
+    ],
+)
+def test_delete_recoloring(nodes, delete):
+    tree = tree_from_values_and_colors(nodes)
+    tree.delete(delete)
+    assert_invariants(tree.root)
+    assert delete not in tree
+    assert len(pre_order(tree)) == len(nodes) - 1
+
+
+@pytest.mark.parametrize(
+    "nodes, delete",
+    [
+        pytest.param([(4, B), (2, B), (6, R), (5, B), (7, B)], 2, id="delete on left"),
+        pytest.param([(4, B), (2, R), (6, B), (1, B), (3, B)], 6, id="delete on right"),
+    ],
+)
+def test_delete_cousin_repainting(nodes, delete):
+    tree = tree_from_values_and_colors(nodes)
+    tree.delete(delete)
+    assert_invariants(tree.root)
+    assert delete not in tree
+    assert len(pre_order(tree)) == len(nodes) - 1

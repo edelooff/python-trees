@@ -25,6 +25,21 @@ def main():
         for value in insert_sample:
             tree.insert(value)
 
+    with tree_renderer(RedBlackTree, "rb-recolor", renderer=draw_redblack_tree) as tree:
+        for value in [13, 16, 8, 17, 15, 11, 5, 14]:
+            tree.insert(value)
+        tree.delete(14)
+        for value in [12, 10, 6, 3, 9]:
+            tree.insert(value)
+        tree.delete(9)
+        for value in [4, 2, 1]:
+            tree.insert(value)
+
+    with tree_renderer(RedBlackTree, "rb-deletes", renderer=draw_redblack_tree) as tree:
+        for value in [4, 2, 6]:
+            tree.insert(value)
+        tree.delete(6)
+
 
 if __name__ == "__main__":
     main()

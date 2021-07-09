@@ -14,6 +14,11 @@ if TYPE_CHECKING:
 class Branch(Enum):
     left = auto()
     right = auto()
+    __inverted__ = {left: right, right: left}
+
+    @property
+    def inverse(self) -> Branch:
+        return Branch(self.__inverted__[self.value])
 
 
 @dataclass

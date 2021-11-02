@@ -122,10 +122,36 @@ class RedBlackTree(Tree):
                 self.publish("balanced", subtree, subtree.left, subtree.right)
 
             if not is_black(relation.close_cousin):
-                # D5
+                # D5: Sibling is now black, close cousin is red, double rotate
+                is_left = relation.dir is Branch.left
+                d_rotate = self.rotate_right_left if is_left else self.rotate_left_right
+                subtree = d_rotate(
+                    relation.parent, relation.sibling, relation.close_cousin
+                )
+                subtree.color = relation.parent.color.inverse
+                assert subtree.left is not None
+                assert subtree.right is not None
+                subtree.left.color = Color.black
+                subtree.right.color = Color.black
+                if relation.parent is self.root:
+                    self.root = subtree
+                self.publish("balanced", subtree, subtree.left, subtree.right)
                 return
             elif not is_black(relation.distant_cousin):
-                # D6
+                # D6: Sibling is now black, distant cousin is red, rotate
+                is_left = relation.dir is Branch.left
+                rotate = self.rotate_left if is_left else self.rotate_right
+                subtree = rotate(
+                    relation.parent, relation.sibling, relation.distant_cousin
+                )
+                subtree.color = relation.parent.color.inverse
+                assert subtree.left is not None
+                assert subtree.right is not None
+                subtree.left.color = Color.black
+                subtree.right.color = Color.black
+                if relation.parent is self.root:
+                    self.root = subtree
+                self.publish("balanced", subtree, subtree.left, subtree.right)
                 return
             else:
                 # D4: Sibling is black, both cousins are black, repaint sibling

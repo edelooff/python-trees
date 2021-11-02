@@ -254,3 +254,74 @@ def test_delete_cousin_repainting(nodes, delete):
     assert_invariants(tree.root)
     assert delete not in tree
     assert len(pre_order(tree)) == len(nodes) - 1
+
+
+@pytest.mark.parametrize("delete", [11, 13])
+@pytest.mark.parametrize(
+    "nodes",
+    [
+        pytest.param(
+            [
+                (8, Color.red),
+                (4, Color.black),
+                (12, Color.black),
+                (2, Color.red),
+                (6, Color.black),
+                (11, Color.black),
+                (13, Color.black),
+                (1, Color.black),
+                (3, Color.black),
+            ],
+            id="left-left-leavy",
+        ),
+        pytest.param(
+            [
+                (8, Color.red),
+                (4, Color.black),
+                (12, Color.black),
+                (2, Color.black),
+                (6, Color.red),
+                (11, Color.black),
+                (13, Color.black),
+                (5, Color.black),
+                (7, Color.black),
+            ],
+            id="left-right-leavy",
+        ),
+        pytest.param(
+            [
+                (16, Color.red),
+                (12, Color.black),
+                (20, Color.black),
+                (11, Color.black),
+                (13, Color.black),
+                (18, Color.black),
+                (22, Color.red),
+                (21, Color.black),
+                (23, Color.black),
+            ],
+            id="right-right-heavy",
+        ),
+        pytest.param(
+            [
+                (16, Color.red),
+                (12, Color.black),
+                (20, Color.black),
+                (11, Color.black),
+                (13, Color.black),
+                (18, Color.red),
+                (22, Color.black),
+                (17, Color.black),
+                (19, Color.black),
+            ],
+            id="right-left-heavy",
+        ),
+    ],
+)
+def test_delete_case_cousin_rebalancing(nodes, delete):
+    """Restores black-depth of tree by rotating at cousins of deleted node."""
+    tree = tree_from_values_and_colors(nodes)
+    tree.delete(delete)
+    assert_invariants(tree.root)
+    assert delete not in tree
+    assert len(pre_order(tree)) == len(nodes) - 1

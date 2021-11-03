@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from itertools import cycle
 from operator import itemgetter
+from typing import Sequence, Tuple
 
 import pytest
 
@@ -74,16 +75,19 @@ def pre_order(tree):
     return list(_traversal(tree.root))
 
 
-def tree_from_values_and_colors(colored_nodes):
+def tree_from_values_and_colors(colored_nodes: Sequence[Tuple[int, Color]]):
     def _traverser(node):
         if node is not None:
             yield node
             yield from _traverser(node.left)
             yield from _traverser(node.right)
 
-    tree = RedBlackTree(map(itemgetter(0), colored_nodes))
     node_colors = dict(colored_nodes)
-    for node in _traverser(tree.root):
+    assert len(node_colors) == len(colored_nodes), "repeated value in node input"
+    tree = RedBlackTree(map(itemgetter(0), colored_nodes))
+    traversal = list(_traverser(tree.root))
+    assert len(traversal) == len(colored_nodes)
+    for node in traversal:
         node.color = node_colors[node.value]
     assert_invariants(tree.root)
     return tree
@@ -256,7 +260,7 @@ def test_delete_cousin_repainting(nodes, delete):
     assert len(pre_order(tree)) == len(nodes) - 1
 
 
-@pytest.mark.parametrize("delete", [11, 13])
+@pytest.mark.parametrize("delete", [11, 12, 13])
 @pytest.mark.parametrize(
     "nodes",
     [
@@ -325,3 +329,23 @@ def test_delete_case_cousin_rebalancing(nodes, delete):
     assert_invariants(tree.root)
     assert delete not in tree
     assert len(pre_order(tree)) == len(nodes) - 1
+
+
+@pytest.mark.parametrize("delete", range(1, 8))
+def test_all_black_rebalancing(delete):
+    values = [4, 2, 6, 1, 3, 5, 7]
+    tree = tree_from_values_and_colors([(node, B) for node in values])
+    tree.delete(delete)
+    assert_invariants(tree.root)
+    assert delete not in tree
+    assert len(pre_order(tree)) == len(values) - 1
+
+
+@pytest.mark.parametrize("delete", range(1, 16))
+def test_all_black_rebalancing_recursive(delete):
+    values = 8, 4, 12, 2, 6, 10, 14, 1, 3, 5, 7, 9, 11, 13, 15
+    tree = tree_from_values_and_colors([(node, B) for node in values])
+    tree.delete(delete)
+    assert_invariants(tree.root)
+    assert delete not in tree
+    assert len(pre_order(tree)) == len(values) - 1

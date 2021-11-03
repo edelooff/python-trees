@@ -45,13 +45,13 @@ class NodeRelations:
         return getattr(self.sibling, self.dir.inverse.name)
 
     @classmethod
-    def from_node_parent(
-        cls, node: RBNode, parent: RBNode, direction=Branch
-    ) -> NodeRelations:
+    def from_node_parent(cls, node: RBNode, parent: RBNode) -> NodeRelations:
         if node is parent.left:
             direction = Branch.left
         elif node is parent.right:
             direction = Branch.right
+        else:
+            raise ValueError(f"Node {node} not a child of {parent}.")
         return cls(node=node, parent=parent, dir=direction)
 
 
@@ -59,25 +59,25 @@ class RedBlackTree(Tree):
     root: Optional[RBNode]
 
     def delete(self, key: Any) -> None:
-        lineage, lineage_copy = tee(reversed(list(self._trace(key))))
-        node = next(lineage_copy)
+        lineage, lineage_parents = tee(reversed(list(self._trace(key))))
+        node = next(lineage_parents)
         self.publish("delete", node)
-        if node.left is node.right is None and node is self.root:
+        if node is self.root and node.left is node.right is None:
             self.root = None
-            self.publish("balanced")
             return  # trivial case 1
         elif node.left is not None and node.right is not None:
             # Find closest relative of two children to limit removal space
             left_children = list(right_edge_path(node.left))
             right_children = list(left_edge_path(node.right))
-            *child_tree, tail = max(left_children, right_children, key=len)
-            node.value = tail.value
+            child_tree = max(left_children, right_children, key=len)
+            lineage, lineage_parents = tee(chain(reversed(child_tree), lineage))
+            tail = next(lineage_parents)
+            node.value, tail.value = tail.value, node.value
             node = tail
-            lineage = chain(reversed(child_tree), lineage_copy)
 
         if node.color is Color.red:
             # Node has no children and is trivially removable
-            replace_black_or_prune(node, (target := next(lineage_copy)))
+            replace_black_or_prune(node, (target := next(lineage_parents)))
             return self.publish("recolor", target)
         elif (child := node.left or node.right) is not None:
             # Node has a single (necessarily red) child, which takes this node's place
@@ -85,22 +85,14 @@ class RedBlackTree(Tree):
                 child.color = Color.black
                 self.root = child
             else:
-                replace_black_or_prune(node, next(lineage_copy), replacement=child)
+                replace_black_or_prune(node, next(lineage_parents), replacement=child)
             return self.publish("recolor", child)
 
-        parent = next(lineage_copy)
-        if node is parent.left:
-            branch = Branch.left
-            parent.left = None
-        else:
-            branch = Branch.right
-            parent.right = None
-
-        for relation in self.lineage_iterator(lineage, direction=branch):
-            if relation.parent is None:
-                # D2: We've arrived at the root, all work is done
-                return
-            elif (
+        for relation in self.lineage_iterator(lineage):
+            if relation.node is node:
+                # Delete target node from the tree by severing link down from parent
+                setattr(relation.parent, relation.dir.name, None)
+            if (
                 is_black(relation.parent)
                 and is_black(relation.sibling)
                 and is_black(relation.close_cousin)
@@ -159,13 +151,11 @@ class RedBlackTree(Tree):
                 self.publish("recolor", relation.sibling, relation.parent)
                 return
 
-    def lineage_iterator(
-        self, node_path: Iterable[RBNode], direction=Branch
-    ) -> Iterator[NodeRelations]:
+    def lineage_iterator(self, node_path: Iterable[RBNode]) -> Iterator[NodeRelations]:
         nodes, parents = tee(node_path)
         next(parents, None)
         for node, parent in zip(nodes, parents):
-            yield NodeRelations.from_node_parent(node, parent, direction=direction)
+            yield NodeRelations.from_node_parent(node, parent)
 
     def insert(self, key: Any) -> RBNode:
         if self.root is None:

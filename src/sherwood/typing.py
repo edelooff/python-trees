@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Optional, Protocol, TypeVar
 
 CT = TypeVar("CT", bound="Comparable")
+T_NODE = TypeVar("T_NODE", bound="Node")
 
 
 class Comparable(Protocol):
@@ -14,9 +15,9 @@ class Node(Protocol):
     value: Comparable
 
     @property
-    def left(self) -> Optional[Node]:
+    def left(self: T_NODE) -> Optional[T_NODE]:
         ...
 
     @property
-    def right(self) -> Optional[Node]:
+    def right(self: T_NODE) -> Optional[T_NODE]:
         ...

@@ -6,6 +6,7 @@ from itertools import chain, takewhile, tee
 from typing import Any, Iterable, Iterator, Optional, final
 
 from .base import BinaryNode, Branch, Tree
+from .utils import left_edge_path, right_edge_path
 
 
 class Color(Enum):
@@ -289,19 +290,3 @@ def has_same_colored_children(node: RBNode) -> bool:
 def invert_color(*nodes: Optional[RBNode]) -> None:
     for node in filter(None, nodes):
         node.color = node.color.inverse
-
-
-def left_edge_path(node: RBNode) -> Iterator[RBNode]:
-    """Yields the given node and all children attached on a left edge."""
-    while node.left is not None:
-        yield node
-        node = node.left
-    yield node
-
-
-def right_edge_path(node: RBNode) -> Iterator[RBNode]:
-    """Yields the given node and all children attached on a right edge."""
-    while node.right is not None:
-        yield node
-        node = node.right
-    yield node

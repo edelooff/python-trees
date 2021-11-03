@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any, Iterator, List, Optional, cast, final
 
 from .base import BinaryNode, Branch, Tree
+from .utils import left_edge_path, right_edge_path
 
 
 @final
@@ -27,7 +28,7 @@ class AVLTree(Tree):
             # Node is right-heavy, find next-larger child node and put its
             # value on the deletion target. Prune the selected node by
             # attaching its children to its parent, and rebalance that.
-            *subtree, tail = left_edge_path(cast(AVLNode, node.right))
+            *subtree, tail = left_edge_path(node.right)
             lineage.extend(subtree)
             node.value = tail.value
             deleted = Branch.right if tail is node.right else Branch.left
@@ -204,19 +205,3 @@ class AVLTree(Tree):
         largest.balance = int(pivot.balance < 0)
         pivot.balance = 0
         return pivot
-
-
-def right_edge_path(node: AVLNode) -> Iterator[AVLNode]:
-    """Yields the given node and all children attached on a right edge."""
-    while node.right is not None:
-        yield node
-        node = node.right
-    yield node
-
-
-def left_edge_path(node: AVLNode) -> Iterator[AVLNode]:
-    """Yields the given node and all children attached on a left edge."""
-    while node.left is not None:
-        yield node
-        node = node.left
-    yield node

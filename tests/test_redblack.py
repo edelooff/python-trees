@@ -5,7 +5,7 @@ from typing import Iterable, Union
 
 import pytest
 
-from sherwood.trees.redblack import Color, RBNode, RedBlackTree
+from sherwood.trees.redblack import Color, RBNode, RedBlackTree, is_black
 
 B, R = Color.black, Color.red
 
@@ -24,8 +24,8 @@ def assert_invariants(node):
 
     assert node.color in Color
     if node.color is Color.red:
-        assert node_is_black(node.left)
-        assert node_is_black(node.right)
+        assert is_black(node.left)
+        assert is_black(node.right)
 
     # All paths have the same number of black-colored nodes in them (black-depth)
     paths = list(paths_to_leaf(node))
@@ -42,13 +42,7 @@ def assert_invariants(node):
 
 def black_depth(path):
     """Returns the count of black nodes in an iterable."""
-    return sum(1 for node in path if node.color is Color.black)
-    return sum(map(node_is_black, path))
-
-
-def node_is_black(node):
-    """Returns whether a node is black, with NIL nodes (None) considered black."""
-    return node is None or node.color is Color.black
+    return sum(map(is_black, path))
 
 
 def paths_to_leaf(node):
@@ -99,6 +93,18 @@ def tree_from_values_and_colors(colored_nodes: Iterable[Union[int, Color]]):
         attach(tree.root, node)
     assert_invariants(tree.root)
     return tree
+
+
+@pytest.mark.parametrize(
+    "node, expected",
+    [
+        pytest.param(RBNode(value=1, color=Color.black), True),
+        pytest.param(RBNode(value=1, color=Color.red), False),
+        pytest.param(None, True),
+    ],
+)
+def test_util_is_black(node, expected):
+    assert is_black(node) is expected
 
 
 def test_tree_insert():

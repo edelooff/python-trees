@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from itertools import cycle
-from operator import itemgetter
-from typing import Sequence, Tuple
+from itertools import chain, cycle, repeat
+from typing import Iterable, Union
 
 import pytest
 
-from sherwood.trees.redblack import Color, RedBlackTree
+from sherwood.trees.redblack import Color, RBNode, RedBlackTree
 
 B, R = Color.black, Color.red
 
@@ -75,20 +74,29 @@ def pre_order(tree):
     return list(_traversal(tree.root))
 
 
-def tree_from_values_and_colors(colored_nodes: Sequence[Tuple[int, Color]]):
-    def _traverser(node):
-        if node is not None:
-            yield node
-            yield from _traverser(node.left)
-            yield from _traverser(node.right)
+def tree_from_values_and_colors(colored_nodes: Iterable[Union[int, Color]]):
+    """Constructs a tree from rank-order values and node colors."""
 
-    node_colors = dict(colored_nodes)
-    assert len(node_colors) == len(colored_nodes), "repeated value in node input"
-    tree = RedBlackTree(map(itemgetter(0), colored_nodes))
-    traversal = list(_traverser(tree.root))
-    assert len(traversal) == len(colored_nodes)
-    for node in traversal:
-        node.color = node_colors[node.value]
+    def node_generator(values_colors):
+        stream = iter(values_colors)
+        for value, color in zip(stream, stream):
+            yield RBNode(value=value, color=color)
+
+    def attach(root, new_node):
+        if new_node.value < root.value:
+            if root.left is not None:
+                return attach(root.left, new_node)
+            root.left = new_node
+        else:
+            if root.right is not None:
+                return attach(root.right, new_node)
+            root.right = new_node
+
+    inodes = node_generator(colored_nodes)
+    tree = RedBlackTree()
+    tree.root = next(inodes)
+    for node in inodes:
+        attach(tree.root, node)
     assert_invariants(tree.root)
     return tree
 
@@ -233,31 +241,33 @@ def test_delete_trivial(insert, delete, expected):
 @pytest.mark.parametrize(
     "nodes, delete",
     [
-        pytest.param([(2, B), (1, B), (3, B)], 1),
-        pytest.param([(2, B), (1, B), (3, B)], 3),
+        pytest.param([2, B, 1, B, 3, B], 1, id="delete left"),
+        pytest.param([2, B, 1, B, 3, B], 3, id="delete right"),
     ],
 )
 def test_delete_recoloring(nodes, delete):
     tree = tree_from_values_and_colors(nodes)
+    tree_length = len(pre_order(tree))
     tree.delete(delete)
     assert_invariants(tree.root)
     assert delete not in tree
-    assert len(pre_order(tree)) == len(nodes) - 1
+    assert len(pre_order(tree)) == tree_length - 1
 
 
 @pytest.mark.parametrize(
     "nodes, delete",
     [
-        pytest.param([(4, B), (2, B), (6, R), (5, B), (7, B)], 2, id="delete on left"),
-        pytest.param([(4, B), (2, R), (6, B), (1, B), (3, B)], 6, id="delete on right"),
+        pytest.param([4, B, 2, B, 6, R, 5, B, 7, B], 2, id="delete on left"),
+        pytest.param([4, B, 2, R, 6, B, 1, B, 3, B], 6, id="delete on right"),
     ],
 )
 def test_delete_cousin_repainting(nodes, delete):
     tree = tree_from_values_and_colors(nodes)
+    tree_length = len(pre_order(tree))
     tree.delete(delete)
     assert_invariants(tree.root)
     assert delete not in tree
-    assert len(pre_order(tree)) == len(nodes) - 1
+    assert len(pre_order(tree)) == tree_length - 1
 
 
 @pytest.mark.parametrize("delete", [11, 12, 13])
@@ -265,59 +275,19 @@ def test_delete_cousin_repainting(nodes, delete):
     "nodes",
     [
         pytest.param(
-            [
-                (8, Color.red),
-                (4, Color.black),
-                (12, Color.black),
-                (2, Color.red),
-                (6, Color.black),
-                (11, Color.black),
-                (13, Color.black),
-                (1, Color.black),
-                (3, Color.black),
-            ],
+            [8, R, 4, B, 12, B, 2, R, 6, B, 11, B, 13, B, 1, B, 3, B],
             id="left-left-leavy",
         ),
         pytest.param(
-            [
-                (8, Color.red),
-                (4, Color.black),
-                (12, Color.black),
-                (2, Color.black),
-                (6, Color.red),
-                (11, Color.black),
-                (13, Color.black),
-                (5, Color.black),
-                (7, Color.black),
-            ],
+            [8, R, 4, B, 12, B, 2, B, 6, R, 11, B, 13, B, 5, B, 7, B],
             id="left-right-leavy",
         ),
         pytest.param(
-            [
-                (16, Color.red),
-                (12, Color.black),
-                (20, Color.black),
-                (11, Color.black),
-                (13, Color.black),
-                (18, Color.black),
-                (22, Color.red),
-                (21, Color.black),
-                (23, Color.black),
-            ],
+            [16, R, 12, B, 20, B, 11, B, 13, B, 18, B, 22, R, 21, B, 23, B],
             id="right-right-heavy",
         ),
         pytest.param(
-            [
-                (16, Color.red),
-                (12, Color.black),
-                (20, Color.black),
-                (11, Color.black),
-                (13, Color.black),
-                (18, Color.red),
-                (22, Color.black),
-                (17, Color.black),
-                (19, Color.black),
-            ],
+            [16, R, 12, B, 20, B, 11, B, 13, B, 18, R, 22, B, 17, B, 19, B],
             id="right-left-heavy",
         ),
     ],
@@ -325,27 +295,34 @@ def test_delete_cousin_repainting(nodes, delete):
 def test_delete_case_cousin_rebalancing(nodes, delete):
     """Restores black-depth of tree by rotating at cousins of deleted node."""
     tree = tree_from_values_and_colors(nodes)
+    tree_length = len(pre_order(tree))
+
     tree.delete(delete)
     assert_invariants(tree.root)
     assert delete not in tree
-    assert len(pre_order(tree)) == len(nodes) - 1
+    assert len(pre_order(tree)) == tree_length - 1
 
 
 @pytest.mark.parametrize("delete", range(1, 8))
 def test_all_black_rebalancing(delete):
-    values = [4, 2, 6, 1, 3, 5, 7]
-    tree = tree_from_values_and_colors([(node, B) for node in values])
+    values = [4, B, 2, B, 6, B, 1, B, 3, B, 5, B, 7, B]
+    tree = tree_from_values_and_colors(values)
+    tree_length = len(pre_order(tree))
+
     tree.delete(delete)
     assert_invariants(tree.root)
     assert delete not in tree
-    assert len(pre_order(tree)) == len(values) - 1
+    assert len(pre_order(tree)) == tree_length - 1
 
 
 @pytest.mark.parametrize("delete", range(1, 16))
 def test_all_black_rebalancing_recursive(delete):
     values = 8, 4, 12, 2, 6, 10, 14, 1, 3, 5, 7, 9, 11, 13, 15
-    tree = tree_from_values_and_colors([(node, B) for node in values])
+    node_iter = chain.from_iterable(zip(values, repeat(Color.black)))
+    tree = tree_from_values_and_colors(node_iter)
+    tree_length = len(pre_order(tree))
+
     tree.delete(delete)
     assert_invariants(tree.root)
     assert delete not in tree
-    assert len(pre_order(tree)) == len(values) - 1
+    assert len(pre_order(tree)) == tree_length - 1

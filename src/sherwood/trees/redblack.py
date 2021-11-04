@@ -5,6 +5,7 @@ from enum import Enum, auto
 from itertools import chain, islice, repeat, takewhile, tee
 from typing import Any, Iterable, Iterator, Optional, final
 
+from ..typing import unwrap
 from .base import BinaryNode, Branch, Tree
 from .utils import left_edge_path, right_edge_path
 
@@ -36,7 +37,7 @@ class NodeCluster:
     dir: Branch
 
     @property
-    def sibling(self):
+    def sibling(self) -> RBNode:
         return getattr(self.parent, self.dir.inverse.name)
 
     @property
@@ -89,65 +90,58 @@ class RedBlackTree(Tree):
                 replace_black_or_prune(node, next(lineage_parents), replacement=child)
             return self.publish("recolor", child)
 
-        for relation in self.lineage_iterator(lineage):
-            if relation.node is node:
+        for cluster in self.lineage_iterator(lineage):
+            if cluster.node is node:
                 # Delete target node from the tree by severing link down from parent
-                setattr(relation.parent, relation.dir.name, None)
+                setattr(cluster.parent, cluster.dir.name, None)
             if (
-                is_black(relation.parent)
-                and is_black(relation.sibling)
-                and is_black(relation.close_cousin)
-                and is_black(relation.distant_cousin)
+                is_black(cluster.parent)
+                and is_black(cluster.sibling)
+                and is_black(cluster.close_cousin)
+                and is_black(cluster.distant_cousin)
             ):
                 # D1: Everything is black, paint sibling red and restore path lenghts
-                relation.sibling.color = Color.red
-                self.publish("recolor", relation.sibling)
+                cluster.sibling.color = Color.red
+                self.publish("recolor", cluster.sibling)
                 continue
-            elif relation.sibling.color is Color.red:
+            elif cluster.sibling.color is Color.red:
                 # D3: Sibling is red with (necessarily) black children; rotate
-                is_left = relation.dir is Branch.left
-                rotate = self.rotate_left if is_left else self.rotate_right
-                subtree = rotate(
-                    relation.parent, relation.sibling, relation.distant_cousin
-                )
-                relation.reattach_rotated(subtree)
+                triplet = cluster.parent, cluster.sibling, cluster.distant_cousin
+                if cluster.dir is Branch.left:
+                    subtree = self.rotate_left(*triplet)
+                else:
+                    subtree = self.rotate_right(*triplet)
+                cluster.reattach_rotated(subtree)
                 self.publish("balanced", subtree, subtree.left, subtree.right)
 
-            if not is_black(relation.close_cousin):
+            if not is_black(cluster.close_cousin):
                 # D5: Sibling is now black, close cousin is red, double rotate
-                is_left = relation.dir is Branch.left
-                d_rotate = self.rotate_right_left if is_left else self.rotate_left_right
-                subtree = d_rotate(
-                    relation.parent, relation.sibling, relation.close_cousin
-                )
-                subtree.color = relation.parent.color.inverse
-                assert subtree.left is not None
-                assert subtree.right is not None
-                subtree.left.color = Color.black
-                subtree.right.color = Color.black
-                relation.reattach_rotated(subtree)
-                self.publish("balanced", subtree, subtree.left, subtree.right)
-                return
-            elif not is_black(relation.distant_cousin):
+                triplet = cluster.parent, cluster.sibling, unwrap(cluster.close_cousin)
+                if cluster.dir is Branch.left:
+                    subtree = self.rotate_right_left(*triplet)
+                else:
+                    subtree = self.rotate_left_right(*triplet)
+                subtree.color = cluster.parent.color.inverse
+                unwrap(subtree.left).color = Color.black
+                unwrap(subtree.right).color = Color.black
+                cluster.reattach_rotated(subtree)
+                return self.publish("balanced", subtree, subtree.left, subtree.right)
+            elif not is_black(cluster.distant_cousin):
                 # D6: Sibling is now black, distant cousin is red, rotate
-                is_left = relation.dir is Branch.left
-                rotate = self.rotate_left if is_left else self.rotate_right
-                subtree = rotate(
-                    relation.parent, relation.sibling, relation.distant_cousin
-                )
-                subtree.color = relation.parent.color.inverse
-                assert subtree.left is not None
-                assert subtree.right is not None
-                subtree.left.color = Color.black
-                subtree.right.color = Color.black
-                relation.reattach_rotated(subtree)
-                self.publish("balanced", subtree, subtree.left, subtree.right)
-                return
+                triplet = cluster.parent, cluster.sibling, cluster.distant_cousin
+                if cluster.dir is Branch.left:
+                    subtree = self.rotate_left(*triplet)
+                else:
+                    subtree = self.rotate_right(*triplet)
+                subtree.color = cluster.parent.color.inverse
+                unwrap(subtree.left).color = Color.black
+                unwrap(subtree.right).color = Color.black
+                cluster.reattach_rotated(subtree)
+                return self.publish("balanced", subtree, subtree.left, subtree.right)
             else:
                 # D4: Sibling is black, both cousins are black, repaint sibling
-                invert_color(relation.sibling, relation.parent)
-                self.publish("recolor", relation.sibling, relation.parent)
-                return
+                invert_color(cluster.sibling, cluster.parent)
+                return self.publish("recolor", cluster.sibling, cluster.parent)
 
     def lineage_iterator(self, node_path: Iterable[RBNode]) -> Iterator[NodeCluster]:
         nodes, parents, grandparents = tee(node_path, 3)
@@ -190,7 +184,6 @@ class RedBlackTree(Tree):
     def _trace(self, key: Any) -> Iterator[RBNode]:
         """Traces a path from the root down to the requested key, or raises KeyError."""
         node = self.root
-        # yield None
         while node is not None:
             yield node
             if key == node.value:

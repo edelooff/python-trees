@@ -332,3 +332,53 @@ def test_all_black_rebalancing_recursive(delete):
     assert_invariants(tree.root)
     assert delete not in tree
     assert len(pre_order(tree)) == tree_length - 1
+
+
+@pytest.mark.parametrize("delete", [6, 10])
+def test_rebalance_subtree_under_root(delete):
+    nodes = [8, R, 4, B, 12, B, 2, R, 6, B, 10, B, 14, R, 1, B, 3, B, 13, B, 15, B]
+    tree = tree_from_values_and_colors(nodes)
+    tree_length = len(pre_order(tree))
+
+    tree.delete(delete)
+    assert_invariants(tree.root)
+    assert delete not in tree
+    assert len(pre_order(tree)) == tree_length - 1
+
+
+@pytest.mark.parametrize("delete", [10, 12, 14])
+@pytest.mark.parametrize(
+    "tail",
+    [
+        pytest.param([2, R, 6, B, 10, B, 14, B, 1, B, 3, B], id="distant cousin"),
+        pytest.param([2, B, 6, R, 10, B, 14, B, 5, B, 7, B], id="close cousin"),
+    ],
+)
+def test_rebalance_left_cousin_subtree_under_root(delete, tail):
+    nodes = [16, B, 8, R, 24, B, 4, B, 12, B, 20, B, 28, B]
+    tree = tree_from_values_and_colors(nodes + tail)
+    tree_length = len(pre_order(tree))
+
+    tree.delete(delete)
+    assert_invariants(tree.root)
+    assert delete not in tree
+    assert len(pre_order(tree)) == tree_length - 1
+
+
+@pytest.mark.parametrize("delete", [18, 20, 22])
+@pytest.mark.parametrize(
+    "tail",
+    [
+        pytest.param([18, B, 22, B, 26, B, 30, R, 29, B, 31, B], id="distant cousin"),
+        pytest.param([18, B, 22, B, 26, R, 30, B, 25, B, 27, B], id="close cousin"),
+    ],
+)
+def test_rebalance_right_cousin_subtree_under_root(delete, tail):
+    nodes = [16, B, 8, B, 24, R, 4, B, 12, B, 20, B, 28, B]
+    tree = tree_from_values_and_colors(nodes + tail)
+    tree_length = len(pre_order(tree))
+
+    tree.delete(delete)
+    assert_invariants(tree.root)
+    assert delete not in tree
+    assert len(pre_order(tree)) == tree_length - 1

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum, auto
-from itertools import chain, takewhile, tee
+from itertools import chain, islice, repeat, takewhile, tee
 from typing import Any, Iterable, Iterator, Optional, final
 
 from .base import BinaryNode, Branch, Tree
@@ -28,9 +28,11 @@ class RBNode(BinaryNode):
 
 
 @dataclass(frozen=True)
-class NodeRelations:
+class NodeCluster:
+    tree: RedBlackTree
     node: RBNode
     parent: RBNode
+    grandparent: Optional[RBNode]
     dir: Branch
 
     @property
@@ -45,15 +47,13 @@ class NodeRelations:
     def distant_cousin(self) -> Optional[RBNode]:
         return getattr(self.sibling, self.dir.inverse.name)
 
-    @classmethod
-    def from_node_parent(cls, node: RBNode, parent: RBNode) -> NodeRelations:
-        if node is parent.left:
-            direction = Branch.left
-        elif node is parent.right:
-            direction = Branch.right
+    def reattach_rotated(self, subtree: RBNode) -> None:
+        if self.grandparent is None:
+            self.tree.root = subtree
+        elif self.grandparent.left is self.parent:
+            self.grandparent.left = subtree
         else:
-            raise ValueError(f"Node {node} not a child of {parent}.")
-        return cls(node=node, parent=parent, dir=direction)
+            self.grandparent.right = subtree
 
 
 class RedBlackTree(Tree):
@@ -110,8 +110,7 @@ class RedBlackTree(Tree):
                 subtree = rotate(
                     relation.parent, relation.sibling, relation.distant_cousin
                 )
-                if relation.parent is self.root:
-                    self.root = subtree
+                relation.reattach_rotated(subtree)
                 self.publish("balanced", subtree, subtree.left, subtree.right)
 
             if not is_black(relation.close_cousin):
@@ -126,8 +125,7 @@ class RedBlackTree(Tree):
                 assert subtree.right is not None
                 subtree.left.color = Color.black
                 subtree.right.color = Color.black
-                if relation.parent is self.root:
-                    self.root = subtree
+                relation.reattach_rotated(subtree)
                 self.publish("balanced", subtree, subtree.left, subtree.right)
                 return
             elif not is_black(relation.distant_cousin):
@@ -142,8 +140,7 @@ class RedBlackTree(Tree):
                 assert subtree.right is not None
                 subtree.left.color = Color.black
                 subtree.right.color = Color.black
-                if relation.parent is self.root:
-                    self.root = subtree
+                relation.reattach_rotated(subtree)
                 self.publish("balanced", subtree, subtree.left, subtree.right)
                 return
             else:
@@ -152,11 +149,19 @@ class RedBlackTree(Tree):
                 self.publish("recolor", relation.sibling, relation.parent)
                 return
 
-    def lineage_iterator(self, node_path: Iterable[RBNode]) -> Iterator[NodeRelations]:
-        nodes, parents = tee(node_path)
-        next(parents, None)
-        for node, parent in zip(nodes, parents):
-            yield NodeRelations.from_node_parent(node, parent)
+    def lineage_iterator(self, node_path: Iterable[RBNode]) -> Iterator[NodeCluster]:
+        nodes, parents, grandparents = tee(node_path, 3)
+        opt_grandparents = chain(grandparents, repeat(None))
+        next(islice(parents, 1, 1), None)
+        next(islice(opt_grandparents, 2, 2), None)
+        for node, parent, grandparent in zip(nodes, parents, opt_grandparents):
+            if node is parent.left:
+                direction = Branch.left
+            elif node is parent.right:
+                direction = Branch.right
+            else:
+                raise ValueError(f"Node {node} not a child of {parent}.")
+            yield NodeCluster(self, node, parent, grandparent, direction)
 
     def insert(self, key: Any) -> RBNode:
         if self.root is None:

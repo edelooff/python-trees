@@ -4,7 +4,12 @@ import pytest
 
 from sherwood.trees.redblack import Color, RBNode, RedBlackTree, is_black
 
-from .helpers import assert_invariants, pre_order, tree_from_values_and_colors
+from .helpers import (
+    assert_invariants,
+    assert_tree_deletion,
+    pre_order,
+    tree_from_values_and_colors,
+)
 
 B, R = Color.black, Color.red
 
@@ -153,8 +158,7 @@ def test_delete_root():
 def test_delete_trivial(insert, delete, expected):
     """Tests deletion of root/leaf nodes requiring no rotation."""
     tree = RedBlackTree(insert)
-    tree.delete(delete)
-    assert_invariants(tree.root)
+    assert_tree_deletion(tree, delete)
     assert pre_order(tree) == expected
 
 
@@ -167,11 +171,7 @@ def test_delete_trivial(insert, delete, expected):
 )
 def test_delete_recoloring(nodes, delete):
     tree = tree_from_values_and_colors(nodes)
-    tree_length = len(pre_order(tree))
-    tree.delete(delete)
-    assert_invariants(tree.root)
-    assert delete not in tree
-    assert len(pre_order(tree)) == tree_length - 1
+    assert_tree_deletion(tree, delete)
 
 
 @pytest.mark.parametrize(
@@ -185,11 +185,7 @@ def test_delete_recoloring(nodes, delete):
 )
 def test_delete_hoist_single_red(nodes, delete):
     tree = tree_from_values_and_colors(nodes)
-    tree_length = len(pre_order(tree))
-    tree.delete(delete)
-    assert_invariants(tree.root)
-    assert delete not in tree
-    assert len(pre_order(tree)) == tree_length - 1
+    assert_tree_deletion(tree, delete)
 
 
 @pytest.mark.parametrize(
@@ -201,11 +197,7 @@ def test_delete_hoist_single_red(nodes, delete):
 )
 def test_delete_cousin_repainting(nodes, delete):
     tree = tree_from_values_and_colors(nodes)
-    tree_length = len(pre_order(tree))
-    tree.delete(delete)
-    assert_invariants(tree.root)
-    assert delete not in tree
-    assert len(pre_order(tree)) == tree_length - 1
+    assert_tree_deletion(tree, delete)
 
 
 @pytest.mark.parametrize("delete", [11, 12, 13])
@@ -233,24 +225,14 @@ def test_delete_cousin_repainting(nodes, delete):
 def test_delete_case_cousin_rebalancing(nodes, delete):
     """Restores black-depth of tree by rotating at cousins of deleted node."""
     tree = tree_from_values_and_colors(nodes)
-    tree_length = len(pre_order(tree))
-
-    tree.delete(delete)
-    assert_invariants(tree.root)
-    assert delete not in tree
-    assert len(pre_order(tree)) == tree_length - 1
+    assert_tree_deletion(tree, delete)
 
 
 @pytest.mark.parametrize("delete", range(1, 8))
 def test_all_black_rebalancing(delete):
     values = [4, B, 2, B, 6, B, 1, B, 3, B, 5, B, 7, B]
     tree = tree_from_values_and_colors(values)
-    tree_length = len(pre_order(tree))
-
-    tree.delete(delete)
-    assert_invariants(tree.root)
-    assert delete not in tree
-    assert len(pre_order(tree)) == tree_length - 1
+    assert_tree_deletion(tree, delete)
 
 
 @pytest.mark.parametrize("delete", range(1, 16))
@@ -258,24 +240,14 @@ def test_all_black_rebalancing_recursive(delete):
     values = 8, 4, 12, 2, 6, 10, 14, 1, 3, 5, 7, 9, 11, 13, 15
     node_iter = chain.from_iterable(zip(values, repeat(Color.black)))
     tree = tree_from_values_and_colors(node_iter)
-    tree_length = len(pre_order(tree))
-
-    tree.delete(delete)
-    assert_invariants(tree.root)
-    assert delete not in tree
-    assert len(pre_order(tree)) == tree_length - 1
+    assert_tree_deletion(tree, delete)
 
 
 @pytest.mark.parametrize("delete", [6, 10])
 def test_rebalance_subtree_under_root(delete):
     nodes = [8, R, 4, B, 12, B, 2, R, 6, B, 10, B, 14, R, 1, B, 3, B, 13, B, 15, B]
     tree = tree_from_values_and_colors(nodes)
-    tree_length = len(pre_order(tree))
-
-    tree.delete(delete)
-    assert_invariants(tree.root)
-    assert delete not in tree
-    assert len(pre_order(tree)) == tree_length - 1
+    assert_tree_deletion(tree, delete)
 
 
 @pytest.mark.parametrize("delete", [10, 12, 14])
@@ -289,12 +261,7 @@ def test_rebalance_subtree_under_root(delete):
 def test_rebalance_left_cousin_subtree_under_root(delete, tail):
     nodes = [16, B, 8, R, 24, B, 4, B, 12, B, 20, B, 28, B]
     tree = tree_from_values_and_colors(nodes + tail)
-    tree_length = len(pre_order(tree))
-
-    tree.delete(delete)
-    assert_invariants(tree.root)
-    assert delete not in tree
-    assert len(pre_order(tree)) == tree_length - 1
+    assert_tree_deletion(tree, delete)
 
 
 @pytest.mark.parametrize("delete", [18, 20, 22])
@@ -308,9 +275,4 @@ def test_rebalance_left_cousin_subtree_under_root(delete, tail):
 def test_rebalance_right_cousin_subtree_under_root(delete, tail):
     nodes = [16, B, 8, B, 24, R, 4, B, 12, B, 20, B, 28, B]
     tree = tree_from_values_and_colors(nodes + tail)
-    tree_length = len(pre_order(tree))
-
-    tree.delete(delete)
-    assert_invariants(tree.root)
-    assert delete not in tree
-    assert len(pre_order(tree)) == tree_length - 1
+    assert_tree_deletion(tree, delete)

@@ -88,3 +88,17 @@ def tree_from_values_and_colors(colored_nodes: Iterable[Union[int, Color]]):
         attach(tree.root, node)
     assert_invariants(tree.root)
     return tree
+
+
+def assert_tree_deletion(tree, target_value):
+    """Deleting the given value from the tree and asserts correct operation:
+
+    1) Invariants are maintained after the delete has been performed
+    2) The deleted value is no longer in the tree
+    3) The tree has shrunk by exactly 1 node
+    """
+    tree_length = len(pre_order(tree))
+    tree.delete(target_value)
+    assert_invariants(tree.root)
+    assert target_value not in tree
+    assert len(pre_order(tree)) == tree_length - 1

@@ -263,6 +263,24 @@ def test_delete_recoloring(nodes, delete):
 @pytest.mark.parametrize(
     "nodes, delete",
     [
+        pytest.param([4, B, 2, B, 6, B, 1, R], 2, id="tail @ left-left"),
+        pytest.param([4, B, 2, B, 6, B, 3, R], 2, id="tail @ left-right"),
+        pytest.param([4, B, 2, B, 6, B, 5, R], 2, id="tail @ right-left"),
+        pytest.param([4, B, 2, B, 6, B, 7, R], 2, id="tail @ right-right"),
+    ],
+)
+def test_delete_hoist_single_red(nodes, delete):
+    tree = tree_from_values_and_colors(nodes)
+    tree_length = len(pre_order(tree))
+    tree.delete(delete)
+    assert_invariants(tree.root)
+    assert delete not in tree
+    assert len(pre_order(tree)) == tree_length - 1
+
+
+@pytest.mark.parametrize(
+    "nodes, delete",
+    [
         pytest.param([4, B, 2, B, 6, R, 5, B, 7, B], 2, id="delete on left"),
         pytest.param([4, B, 2, R, 6, B, 1, B, 3, B], 6, id="delete on right"),
     ],

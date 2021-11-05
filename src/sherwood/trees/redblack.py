@@ -51,10 +51,8 @@ class NodeCluster:
     def reattach_rotated(self, subtree: RBNode) -> None:
         if self.grandparent is None:
             self.tree.root = subtree
-        elif self.grandparent.left is self.parent:
-            self.grandparent.left = subtree
         else:
-            self.grandparent.right = subtree
+            replace_child(self.parent, self.grandparent, subtree)
 
 
 class RedBlackTree(Tree):
@@ -79,15 +77,14 @@ class RedBlackTree(Tree):
 
         if node.color is Color.red:
             # Node has no children and is trivially removable
-            replace_black_or_prune(node, (target := next(lineage_parents)))
-            return self.publish("recolor", target)
+            return replace_child(node, next(lineage_parents), None)
         elif (child := node.left or node.right) is not None:
             # Node has a single (necessarily red) child, which takes this node's place
+            child.color = Color.black
             if node is self.root:
-                child.color = Color.black
                 self.root = child
             else:
-                replace_black_or_prune(node, next(lineage_parents), replacement=child)
+                replace_child(node, next(lineage_parents), child)
             return self.publish("recolor", child)
 
         for cluster in self.lineage_iterator(lineage):
@@ -203,7 +200,7 @@ class RedBlackTree(Tree):
                 self.publish("recolor", parent)
                 break
             grandparent = next(lineage)
-            if has_same_colored_children(grandparent):
+            if is_black(grandparent.left) is is_black(grandparent.right):
                 invert_color(grandparent, grandparent.left, grandparent.right)
                 node = grandparent
                 self.publish("recolor", node, node.left, node.right)
@@ -261,30 +258,19 @@ class RedBlackTree(Tree):
         return pivot
 
 
+def invert_color(*nodes: Optional[RBNode]) -> None:
+    """Inverts color of the given nodes after filtering out None values."""
+    for node in filter(None, nodes):
+        node.color = node.color.inverse
+
+
 def is_black(node: Optional[RBNode]) -> bool:
     """Whether or not a node is colored black, with NIL nodes considered black."""
     return node is None or node.color is Color.black
 
 
-def replace_black_or_prune(
-    node: RBNode, parent: RBNode, replacement: Optional[RBNode] = None
-) -> None:
-    if replacement is not None:
-        replacement.color = Color.black
-    if parent.left is node:
+def replace_child(child: RBNode, parent: RBNode, replacement: Optional[RBNode]) -> None:
+    if parent.left is child:
         parent.left = replacement
     else:
         parent.right = replacement
-
-
-def has_same_colored_children(node: RBNode) -> bool:
-    return (
-        node.left is not None
-        and node.right is not None
-        and node.left.color is node.right.color
-    )
-
-
-def invert_color(*nodes: Optional[RBNode]) -> None:
-    for node in filter(None, nodes):
-        node.color = node.color.inverse

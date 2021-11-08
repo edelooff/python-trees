@@ -74,4 +74,4 @@ class Tree(ABC):
         if self.bus is not None:
             if self.root is None:
                 raise ValueError("Cannot publish events for empty tree.")
-            self.bus.publish(topic, self.root, set(filter(None, nodes)))
+            self.bus.publish(topic, self.root, tuple(filter(None, nodes)))

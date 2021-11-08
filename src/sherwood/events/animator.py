@@ -20,19 +20,19 @@ class Animator:
         self.renderer = renderer
 
     def graph_delete(self, event: Event) -> None:
-        self._render(AnimationFrame(event.root, event.nodes, marked_hue=0.95))
+        self._render(AnimationFrame(event.root, event.node_set, marked_hue=0.95))
 
     def graph_insert(self, event: Event) -> None:
-        self._render(AnimationFrame(event.root, event.nodes, marked_hue=0.4))
+        self._render(AnimationFrame(event.root, event.node_set, marked_hue=0.4))
 
     def graph_rebalanced(self, event: Event) -> None:
-        self._render(AnimationFrame(event.root, event.nodes, marked_hue=0.62))
+        self._render(AnimationFrame(event.root, event.node_set, marked_hue=0.62))
 
     def graph_recolored(self, event: Event) -> None:
-        self._render(AnimationFrame(event.root, event.nodes, marked_hue=0.15))
+        self._render(AnimationFrame(event.root, event.node_set, marked_hue=0.15))
 
     def graph_rotation(self, event: Event) -> None:
-        self._render(AnimationFrame(event.root, event.nodes, marked_hue=0.83))
+        self._render(AnimationFrame(event.root, event.node_set, marked_hue=0.83))
 
     def _render(self, frame: AnimationFrame) -> None:
         frame.render(self.frame_name, self.renderer)
@@ -73,7 +73,7 @@ class AsyncPoolAnimator(Animator):
 @dataclass
 class AnimationFrame:
     root: Node
-    marked: Set[Node]
+    marked_nodes: Set[Node]
     marked_hue: float = 0
 
     @classmethod
@@ -81,7 +81,7 @@ class AnimationFrame:
         serialization = iter(frame.serialization)
         _branch, root_value, root_options = next(serialization)
         root = node = AnimationNode(root_value, options=root_options)
-        marked: Set[Node] = {root} if 0 in frame.node_indices else set()
+        marked: Set[Node] = {root} if 0 in frame.marked_node_indices else set()
         stack = []
         for idx, (branch_id, value, options) in enumerate(serialization, 1):
             if branch_id == 0:
@@ -91,30 +91,30 @@ class AnimationFrame:
                 for _ in range(1, branch_id):
                     node = stack.pop()
                 node.right = node = AnimationNode(value, options=options)
-            if idx in frame.node_indices:
+            if idx in frame.marked_node_indices:
                 marked.add(node)
-        return cls(root, marked, frame.hue)
+        return cls(root, marked, frame.marked_node_hue)
 
     def serialize(self) -> SerialFrame:
         serialization: List[Any] = []
-        node_indices: List[int] = []
+        marked_node_indices: List[int] = []
         cur_branch = 0
         for node_index, (node, new_branch) in enumerate(dfs_branch_encoded(self.root)):
-            if node in self.marked:
-                node_indices.append(node_index)
+            if node in self.marked_nodes:
+                marked_node_indices.append(node_index)
             change, cur_branch = 1 + cur_branch - new_branch, new_branch
             serialization.append((change, node.value, node_extra_values(node)))
-        return SerialFrame(serialization, node_indices, self.marked_hue)
+        return SerialFrame(serialization, marked_node_indices, self.marked_hue)
 
     def render(self, name: str, renderer: Renderer) -> None:
-        graph = renderer(self.root, self.marked, self.marked_hue)
+        graph = renderer(self.root, self.marked_nodes, self.marked_hue)
         graph.write_png(name)
 
 
 class SerialFrame(NamedTuple):
     serialization: List[Tuple[int, Any, Dict[str, Any]]]
-    node_indices: List[int]
-    hue: float
+    marked_node_indices: List[int]
+    marked_node_hue: float
 
 
 def dfs_branch_encoded(

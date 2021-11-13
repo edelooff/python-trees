@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional, Protocol, TypeVar
+from typing import NamedTuple, Optional, Protocol, TypeVar
 
 T = TypeVar("T")
 CT = TypeVar("CT", bound="Comparable")
@@ -10,6 +10,11 @@ T_NODE = TypeVar("T_NODE", bound="Node")
 class Comparable(Protocol):
     def __lt__(self: CT, other: CT) -> bool:
         ...
+
+
+class Graft(NamedTuple):
+    branch: int
+    node: Node
 
 
 class Node(Protocol):

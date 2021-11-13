@@ -5,6 +5,7 @@ from typing import (
     ClassVar,
     Dict,
     Iterator,
+    List,
     Optional,
     Sequence,
     Set,
@@ -37,6 +38,11 @@ class TreeRenderer:
         "dir": "none",
         "penwidth": 2,
     }
+    extra_edge_defaults: ClassVar[DotAttrDict] = {
+        "dir": "forward",
+        "arrowsize": 0.75,
+        "style": "dashed",
+    }
     graph_defaults: ClassVar[DotAttrDict] = {
         "bgcolor": "#ffffff00",
         "nodesep": 0.3,
@@ -58,6 +64,7 @@ class TreeRenderer:
         root: Node,
         marked_nodes: Optional[Set[Node]] = None,
         marked_hue: float = 0,
+        extra_edges: Optional[List[Tuple[Node, Node]]] = (),
     ) -> Dot:
         """Returns a Dot graph for the tree starting at the given node.
 
@@ -76,6 +83,8 @@ class TreeRenderer:
             if node.right:
                 self.draw_node(context, node.right, node)
                 nodes.append(node.right)
+        for source, target in extra_edges:
+            self.draw_extra_edge(context, source, target)
         return context.graph
 
     def draw_divider(self, context: DrawContext, node: Node) -> None:
@@ -91,6 +100,11 @@ class TreeRenderer:
             parent, target = target, f":{target}"
             context.graph.add_node(DotNode(target, **marker_style))
             context.graph.add_edge(Edge(parent, target, style="invis", weight=5))
+
+    def draw_extra_edge(self, context: DrawContext, source: Node, target: Node) -> None:
+        """Draws additional edge between nodes in the context edge_color."""
+        edge_attrs = dict(**self.extra_edge_defaults, color=context.edge_color)
+        context.graph.add_edge(Edge(str(id(source)), str(id(target)), **edge_attrs))
 
     def draw_node(
         self, context: DrawContext, node: Node, parent: Optional[Node]

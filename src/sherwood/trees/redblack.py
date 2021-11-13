@@ -74,6 +74,7 @@ class RedBlackTree(Tree):
             lineage, lineage_parents = tee(chain(reversed(child_tree), lineage))
             tail = next(lineage_parents)
             node.value, tail.value = tail.value, node.value
+            self.publish("delete_swap", node, tail)
             node = tail
 
         if node.color is Color.red:

@@ -28,7 +28,7 @@ class RBNode(BinaryNode):
     right: Optional[RBNode] = None
 
 
-@dataclass(frozen=True)
+@dataclass
 class NodeCluster:
     tree: RedBlackTree
     node: RBNode
@@ -53,6 +53,7 @@ class NodeCluster:
             self.tree.root = subtree
         else:
             replace_child(self.parent, self.grandparent, subtree)
+        self.grandparent = subtree
 
 
 class RedBlackTree(Tree):

@@ -164,3 +164,16 @@ class TestRebalancingDeletes:
         """Asserts the red cousins keeps their child trees in appropriate positions."""
         tree = tree_from_values_and_colors([8, R, 4, B, 12, B] + tail_nodes)
         assert_tree_deletion(tree, delete)
+
+    @pytest.mark.parametrize(
+        "tail_nodes",
+        [
+            pytest.param([], id="base (single rotation)"),
+            pytest.param([5, R, 7, R], id="close cousin rotation"),
+            pytest.param([1, R, 3, R], id="distanc cousin rotation"),
+        ],
+    )
+    def test_red_sibling_double_rotation(self, tail_nodes):
+        base = [8, B, 4, R, 12, B, 2, B, 6, B]
+        tree = tree_from_values_and_colors(base + tail_nodes)
+        assert_tree_deletion(tree, 12)

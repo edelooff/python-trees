@@ -1,15 +1,27 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from multiprocessing import Pool
 from multiprocessing.pool import Pool as PoolType
-from typing import Any, Dict, Iterator, List, NamedTuple, Optional, Set, Tuple, Type
+from operator import attrgetter
+from typing import (
+    Any,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    NamedTuple,
+    Optional,
+    Set,
+    Tuple,
+    Type,
+)
 
 from ..renderers import Renderer, draw_tree
 from ..trees.base import Tree
-from ..typing import Node
+from ..typing import Comparable, Graft, Node
 from .base import AnimationNode, Bus, Event
 
 
@@ -20,19 +32,30 @@ class Animator:
         self.renderer = renderer
 
     def graph_delete(self, event: Event) -> None:
-        self._render(AnimationFrame(event.root, event.nodes, marked_hue=0.95))
+        self._render(AnimationFrame(event.root, event.node_set, marked_hue=0.95))
+
+    def graph_delete_swap(self, event: Event) -> None:
+        origin, swapped = event.nodes
+        self._render(
+            AnimationFrame(
+                event.root,
+                {swapped},
+                marked_hue=0.95,
+                extra_edges=[(origin, swapped)],
+            )
+        )
 
     def graph_insert(self, event: Event) -> None:
-        self._render(AnimationFrame(event.root, event.nodes, marked_hue=0.4))
+        self._render(AnimationFrame(event.root, event.node_set, marked_hue=0.4))
 
     def graph_rebalanced(self, event: Event) -> None:
-        self._render(AnimationFrame(event.root, event.nodes, marked_hue=0.62))
+        self._render(AnimationFrame(event.root, event.node_set, marked_hue=0.62))
 
     def graph_recolored(self, event: Event) -> None:
-        self._render(AnimationFrame(event.root, event.nodes, marked_hue=0.15))
+        self._render(AnimationFrame(event.root, event.node_set, marked_hue=0.15))
 
     def graph_rotation(self, event: Event) -> None:
-        self._render(AnimationFrame(event.root, event.nodes, marked_hue=0.83))
+        self._render(AnimationFrame(event.root, event.node_set, marked_hue=0.83))
 
     def _render(self, frame: AnimationFrame) -> None:
         frame.render(self.frame_name, self.renderer)
@@ -47,6 +70,7 @@ class Animator:
         """Returns a new Bus, subscribed to all supported animation events."""
         bus = Bus()
         bus.subscribe("delete", self.graph_delete)
+        bus.subscribe("delete_swap", self.graph_delete_swap)
         bus.subscribe("insert", self.graph_insert)
         bus.subscribe("recolor", self.graph_recolored)
         bus.subscribe("rotate", self.graph_rotation)
@@ -73,57 +97,79 @@ class AsyncPoolAnimator(Animator):
 @dataclass
 class AnimationFrame:
     root: Node
-    marked: Set[Node]
+    marked_nodes: Set[Node]
     marked_hue: float = 0
+    extra_edges: List[Tuple[Node, Node]] = field(default_factory=list)
 
     @classmethod
     def from_serialized(cls, frame: SerialFrame) -> AnimationFrame:
         serialization = iter(frame.serialization)
-        _branch, root_value, root_options = next(serialization)
-        root = node = AnimationNode(root_value, options=root_options)
-        marked: Set[Node] = {root} if 0 in frame.node_indices else set()
+        base = next(serialization)
+        root = node = AnimationNode(base.value, options=base.options)
+        node_map = {0: root}
         stack = []
-        for idx, (branch_id, value, options) in enumerate(serialization, 1):
-            if branch_id == 0:
+        for index, graft in enumerate(serialization, 1):
+            if graft.relative_branch == 0:
                 stack.append(node)
-                node.left = node = AnimationNode(value, options=options)
+                node.left = node = AnimationNode(graft.value, options=graft.options)
             else:
-                for _ in range(1, branch_id):
+                for _ in range(1, graft.relative_branch):
                     node = stack.pop()
-                node.right = node = AnimationNode(value, options=options)
-            if idx in frame.node_indices:
-                marked.add(node)
-        return cls(root, marked, frame.hue)
+                node.right = node = AnimationNode(graft.value, options=graft.options)
+            node_map[index] = node
+        return cls(
+            root=root,
+            marked_nodes={node_map[index] for index in frame.marked_node_indices},
+            marked_hue=frame.marked_node_hue,
+            extra_edges=[(node_map[e1], node_map[e2]) for e1, e2, in frame.extra_edges],
+        )
 
     def serialize(self) -> SerialFrame:
-        serialization: List[Any] = []
-        node_indices: List[int] = []
-        cur_branch = 0
-        for node_index, (node, new_branch) in enumerate(dfs_branch_encoded(self.root)):
-            if node in self.marked:
-                node_indices.append(node_index)
-            change, cur_branch = 1 + cur_branch - new_branch, new_branch
-            serialization.append((change, node.value, node_extra_values(node)))
-        return SerialFrame(serialization, node_indices, self.marked_hue)
+        serialization = list(dfs_branch_encoded(self.root))
+        nodes = map(attrgetter("node"), serialization)
+        index_map = {node: index for index, node in enumerate(nodes)}
+        return SerialFrame(
+            serialization=list(self._relative_serializer(serialization)),
+            marked_node_indices=[index_map[node] for node in self.marked_nodes],
+            marked_node_hue=self.marked_hue,
+            extra_edges=[(index_map[e1], index_map[e2]) for e1, e2 in self.extra_edges],
+        )
 
     def render(self, name: str, renderer: Renderer) -> None:
-        graph = renderer(self.root, self.marked, self.marked_hue)
+        graph = renderer(
+            self.root,
+            self.marked_nodes,
+            self.marked_hue,
+            self.extra_edges,
+        )
         graph.write_png(name)
+
+    @staticmethod
+    def _relative_serializer(serialization: Iterable[Graft]) -> Iterator[SerialNode]:
+        current = 0
+        for abs_branch, node in serialization:
+            relative_branch, current = 1 + current - abs_branch, abs_branch
+            yield SerialNode(relative_branch, node.value, node_extra_values(node))
 
 
 class SerialFrame(NamedTuple):
-    serialization: List[Tuple[int, Any, Dict[str, Any]]]
-    node_indices: List[int]
-    hue: float
+    serialization: List[SerialNode]
+    marked_node_indices: List[int]
+    marked_node_hue: float
+    extra_edges: List[Tuple[int, int]]
 
 
-def dfs_branch_encoded(
-    node: Optional[Node], branch_id: int = 0
-) -> Iterator[Tuple[Node, int]]:
+class SerialNode(NamedTuple):
+    relative_branch: int
+    value: Comparable
+    options: Dict[str, Any]
+
+
+def dfs_branch_encoded(node: Optional[Node], branch: int = 0) -> Iterator[Graft]:
     if node is not None:
-        yield node, branch_id
-        yield from dfs_branch_encoded(node.left, branch_id=branch_id + 1)
-        yield from dfs_branch_encoded(node.right, branch_id=branch_id)
+        yield Graft(branch, node)
+        yield from dfs_branch_encoded(node.left, branch=branch + 1)
+        yield from dfs_branch_encoded(node.right, branch=branch)
 
 
 def node_extra_values(node: Node) -> Dict[str, Any]:

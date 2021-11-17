@@ -6,17 +6,18 @@ from sherwood.trees import AVLTree, RedBlackTree
 
 
 def main():
-    example_values = [43, 81, 95, 16, 28, 23, 63, 57]
+    example_values = [43, 81, 95, 16, 28, 23, 86]
     with tree_renderer(AVLTree, "avl-example", renderer=draw_avl_tree) as tree:
         for value in example_values:
             tree.insert(value)
-        tree.delete(16)
+        tree.delete(28)
 
     with tree_renderer(RedBlackTree, "rb-example", renderer=draw_redblack_tree) as tree:
         for value in example_values:
             tree.insert(value)
+        tree.delete(81)
 
-    insert_sample = random.sample(range(100, 1000), 32)
+    insert_sample = random.sample(range(100, 1000), 24)
     with tree_renderer(AVLTree, "avl-inserts", renderer=draw_avl_tree) as tree:
         for value in insert_sample:
             tree.insert(value)
@@ -34,11 +35,6 @@ def main():
         tree.delete(9)
         for value in [4, 2, 1]:
             tree.insert(value)
-
-    with tree_renderer(RedBlackTree, "rb-deletes", renderer=draw_redblack_tree) as tree:
-        for value in [4, 2, 6]:
-            tree.insert(value)
-        tree.delete(6)
 
 
 if __name__ == "__main__":

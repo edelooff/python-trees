@@ -16,6 +16,7 @@ from typing import (
 from pydot import Dot, Edge
 from pydot import Node as DotNode
 
+from ..trees.base import Branch
 from ..typing import Node
 from .context import DrawContext
 
@@ -48,6 +49,12 @@ class TreeRenderer:
         "nodesep": 0.3,
         "ranksep": 0.2,
     }
+    hidden_node: ClassVar[DotAttrDict] = {
+        "label": "",
+        "width": 0,
+        "height": 0,
+        "style": "invis",
+    }
     node_defaults: ClassVar[DotAttrDict] = {
         "color": "#222222",
         "fillcolor": "#667788",
@@ -75,17 +82,28 @@ class TreeRenderer:
         self.draw_node(context, root, None)
         nodes = deque([root])
         while nodes:
-            node = nodes.popleft()
-            if node.left:
-                self.draw_node(context, node.left, node)
-                nodes.append(node.left)
-            self.draw_divider(context, node)
-            if node.right:
-                self.draw_node(context, node.right, node)
-                nodes.append(node.right)
+            if (node := nodes.popleft()) is not None:
+                nodes.append(self.draw_child(context, node, Branch.left))
+                self.draw_divider(context, node)
+                nodes.append(self.draw_child(context, node, Branch.right))
         for source, target in extra_edges:
             self.draw_extra_edge(context, source, target)
         return context.graph
+
+    def draw_child(self, context: DrawContext, node: Node, branch: Branch) -> Optional[Node]:
+        """Draws a node's child, based on the Branch direction.
+
+        After adding the node, an edge is drawn from the parent down to the child.
+        Additional graphviz attributes for the edge are derived from `edge_attrs`.
+        If there is no child at the given branch direction, a hidden child is drawn.
+        """
+        if (child := getattr(node, branch.name)) is not None:
+            self.draw_node(context, child, node)
+            edge_attrs = dict(self.edge_attrs(context, child, node))
+            context.graph.add_edge(Edge(str(id(node)), str(id(child)), **edge_attrs))
+        elif getattr(node, branch.inverse.name):
+            self.draw_missing_child(context, node)
+        return child
 
     def draw_divider(self, context: DrawContext, node: Node) -> None:
         """Adds an invisible vertical divider to the graph in the DrawContext.
@@ -94,11 +112,10 @@ class TreeRenderer:
         This divider consists of a number of nodes equal to the 'height' of the
         given node and the nodes and edges to them are drawn invisibly.
         """
-        marker_style = {"label": "", "width": 0, "height": 0, "style": "invis"}
         target = str(id(node))
         for _ in range(context.height(node)):
             parent, target = target, f":{target}"
-            context.graph.add_node(DotNode(target, **marker_style))
+            context.graph.add_node(DotNode(target, **self.hidden_node))
             context.graph.add_edge(Edge(parent, target, style="invis", weight=5))
 
     def draw_extra_edge(self, context: DrawContext, source: Node, target: Node) -> None:
@@ -106,22 +123,22 @@ class TreeRenderer:
         edge_attrs = dict(**self.extra_edge_defaults, color=context.edge_color)
         context.graph.add_edge(Edge(str(id(source)), str(id(target)), **edge_attrs))
 
+    def draw_missing_child(self, context: DrawContext, parent: Node) -> None:
+        """Adds an empty node and edge for nodes with a single child.
+
+        This avoids quirky behavior from drawing additional edges in graphs
+        where the extra edge would run past nodes with only a single child.
+        """
+        target = f":d{id(parent)}"
+        context.graph.add_node(DotNode(target, **self.hidden_node))
+        context.graph.add_edge(Edge(str(id(parent)), target, style="invis"))
+
     def draw_node(
         self, context: DrawContext, node: Node, parent: Optional[Node]
     ) -> None:
-        """Adds the given node to the graph in the DrawContext.
-
-        When the parent argument is given and non-None, an edge is drawn from
-        parent down to the given node. The node is labeled with the string
-        representation of its value. Additional graphviz attributes for both
-        the Node and Edge are derived from `node_attrs` and `edge_attrs` resp.
-        """
-        node_attrs = dict(self.node_attrs(context, node))
-        node_attrs.setdefault("label", str(node.value))
+        """Draws the given node with attributes derived from `node_attrs`."""
+        node_attrs = dict(self.node_attrs(context, node), label=str(node.value))
         context.graph.add_node(DotNode(str(id(node)), **node_attrs))
-        if parent is not None:
-            edge_attrs = dict(self.edge_attrs(context, node, parent))
-            context.graph.add_edge(Edge(str(id(parent)), str(id(node)), **edge_attrs))
 
     def edge_attrs(self, context: DrawContext, node: Node, parent: Node) -> DotAttrs:
         """Iterator of Dot attributes over all provided edge attribute functions."""

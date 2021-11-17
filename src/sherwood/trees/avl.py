@@ -31,7 +31,8 @@ class AVLTree(Tree):
             # attaching its children to its parent, and rebalance that.
             *subtree, tail = left_edge_path(node.right)
             lineage.extend(subtree)
-            node.value = tail.value
+            node.value, tail.value = tail.value, node.value
+            self.publish("delete_swap", node, tail)
             deleted = Branch.right if tail is node.right else Branch.left
             return self.rebalance_removal(lineage, deleted=deleted, new=tail.right)
         elif node.left is not None:
@@ -39,7 +40,8 @@ class AVLTree(Tree):
             # node and perform same (mirrored) actions as in previous case.
             *subtree, tail = right_edge_path(node.left)
             lineage.extend(subtree)
-            node.value = tail.value
+            node.value, tail.value = tail.value, node.value
+            self.publish("delete_swap", node, tail)
             deleted = Branch.left if tail is node.left else Branch.right
             return self.rebalance_removal(lineage, deleted=deleted, new=tail.left)
         parent = lineage[-2]

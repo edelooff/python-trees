@@ -156,7 +156,7 @@ class SerialFrame(NamedTuple):
     serialization: List[SerialNode]
     marked_node_indices: List[int]
     marked_node_hue: float
-    extra_edges: Optional[List[Tuple[int, int]]] = None
+    extra_edges: List[Tuple[int, int]]
 
 
 class SerialNode(NamedTuple):

@@ -3,9 +3,9 @@ from dataclasses import dataclass
 from typing import (
     Callable,
     ClassVar,
+    Deque,
     Dict,
     Iterator,
-    List,
     Optional,
     Sequence,
     Set,
@@ -26,7 +26,7 @@ DotAttrDict = Dict[str, DotValue]
 DotAttrs = Iterator[Tuple[str, DotValue]]
 EdgeAttributeGenerator = Callable[[DrawContext, Node, Node], DotAttrs]
 NodeAttributeGenerator = Callable[[DrawContext, Node], DotAttrs]
-Renderer = Callable[[Node, Optional[Set[Node]], float], Dot]
+Renderer = Callable[[Node, Set[Node], float, Sequence[Tuple[Node, Node]]], Dot]
 
 
 @dataclass
@@ -69,9 +69,9 @@ class TreeRenderer:
     def __call__(
         self,
         root: Node,
-        marked_nodes: Optional[Set[Node]] = None,
+        marked_nodes: Set[Node],
         marked_hue: float = 0,
-        extra_edges: Optional[List[Tuple[Node, Node]]] = (),
+        extra_edges: Sequence[Tuple[Node, Node]] = (),
     ) -> Dot:
         """Returns a Dot graph for the tree starting at the given node.
 
@@ -80,7 +80,7 @@ class TreeRenderer:
         """
         context = self.new_context(marked_nodes or set(), marked_hue)
         self.draw_node(context, root, None)
-        nodes = deque([root])
+        nodes: Deque[Optional[Node]] = deque([root])
         while nodes:
             if (node := nodes.popleft()) is not None:
                 nodes.append(self.draw_child(context, node, Branch.left))
@@ -90,7 +90,9 @@ class TreeRenderer:
             self.draw_extra_edge(context, source, target)
         return context.graph
 
-    def draw_child(self, context: DrawContext, node: Node, branch: Branch) -> Optional[Node]:
+    def draw_child(
+        self, context: DrawContext, node: Node, branch: Branch
+    ) -> Optional[Node]:
         """Draws a node's child, based on the Branch direction.
 
         After adding the node, an edge is drawn from the parent down to the child.
